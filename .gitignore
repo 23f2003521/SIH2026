@@ -1,0 +1,33 @@
+# Environments
+venv/
+.venv/
+env/
+.jupyter_env/
+.jupyter_data/
+
+# Datasets (Large Data & Media)
+*.csv
+Oil Spill Detection Dataset/
+*.jpg
+*.png
+*.zip
+*.tar.gz
+
+# Python & Jupyter Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+
+# Excluded Legacy & Experimental Files (as requested)
+app.py
+app1.py
+app*.py
+old_PCA_new*.ipynb
+old_PCA*.ipynb
+ais-anomaly-detection.ipynb
+
+# OS / Temporary Files
+.DS_Store
+*.log
+
