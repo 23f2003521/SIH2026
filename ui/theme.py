@@ -33,13 +33,15 @@ BAND_COLORS = {
     "cleared by proximity": MUTED,
 }
 
+# Keyed by the real MMSIs in the Mauritius AOI feed. The casualty is the only
+# one in the alert colour; anything not listed falls back to ACCENT.
 VESSEL_COLORS = {
-    371284000: CRITICAL,     # Wakashio
-    419002731: "#6c8cff",
-    256891004: "#38d9a9",
-    563114900: "#b197fc",
-    645079210: "#ffa94d",
-    352001899: "#f783ac",
+    372711000: CRITICAL,     # WAKASHIO -- the casualty
+    564796000: "#6c8cff",    # KOTA SURIA
+    538006057: "#38d9a9",    # VERY MARIA
+    477007600: "#b197fc",    # DHT EDELWEISS
+    477848500: "#ffa94d",    # PALONA
+    371282000: "#f783ac",    # AQUAVITA SOL
 }
 
 CSS = f"""

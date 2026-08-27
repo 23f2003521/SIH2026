@@ -370,3 +370,29 @@ def test_sar_checkpoint_is_trained():
     sd = torch.load(SAR_WEIGHTS, map_location="cpu")
     tracked = {int(v) for k, v in sd.items() if k.endswith("num_batches_tracked")}
     assert tracked and max(tracked) > 0, "SAR decoder BatchNorm was never trained"
+
+
+def test_no_invented_vessels_remain(scenario):
+    """
+    An earlier build carried six fabricated vessels. Their names and MMSIs must
+    not survive anywhere a user can see them -- including colour lookup tables,
+    which is where the last one hid.
+    """
+    import re
+    from pathlib import Path
+
+    from ui import theme
+
+    banned_names = ["SEA HARVESTER", "BLUE BAY TRADER", "BULK PIONEER",
+                    "CAP FLORES", "KAVERI PRIDE"]
+    banned_mmsis = {371284000, 645079210, 352001899, 563114900, 256891004, 419002731}
+
+    real = set(scenario["ais"]["mmsi"].unique())
+    assert set(theme.VESSEL_COLORS) <= real, "colour map references unknown MMSIs"
+    assert not (set(theme.VESSEL_COLORS) & banned_mmsis)
+
+    root = Path(__file__).resolve().parent.parent
+    for path in list((root / "poseatsea").rglob("*.py")) + list((root / "ui").rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        for name in banned_names:
+            assert name not in text, f"{path.name} still references {name}"
