@@ -1,11 +1,36 @@
-torch
-torchvision
-scikit-learn
-pandas
-numpy
-matplotlib
-seaborn
-pillow
-streamlit
-joblib
-jupyter
+# POSEatSea -- runtime dependencies.
+#
+# Deliberately expressed as ranges, not exact pins. This same file has to
+# resolve on a Windows/Python 3.14 dev box and on a Linux/Python 3.11 hosted
+# builder; hard pins to the versions that happened to resolve locally fail on
+# the other. Exact local versions are recorded in docs/VERSIONS.txt.
+#
+# The CPU wheel index keeps torch to ~200 MB instead of pulling ~2.5 GB of CUDA
+# libraries that a free CPU host cannot use anyway. Remove this line if you are
+# deploying to a GPU box.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# --- models ---------------------------------------------------------------
+torch>=2.2,<3
+segmentation-models-pytorch>=0.3.3    # supplies the mit_b2 SegFormer encoder
+timm>=0.9                             # pulled in by smp for the encoder zoo
+
+# Pinned exactly: the AIS scaler was pickled under scikit-learn 1.6.1, and an
+# exact match removes the InconsistentVersionWarning rather than suppressing it.
+scikit-learn==1.6.1
+joblib>=1.3
+
+# --- data / imaging -------------------------------------------------------
+numpy>=1.26,<3
+pandas>=2.0
+opencv-python-headless>=4.8           # headless: no GUI libs needed on a server
+pillow>=10.0
+
+# --- console --------------------------------------------------------------
+streamlit>=1.40
+altair>=5.0
+
+# Lets the app pull weights from a Hugging Face repo when they are not in the
+# checkout -- required on hosts that do not resolve Git LFS pointers, such as
+# Streamlit Community Cloud. See poseatsea/weights.py.
+huggingface-hub>=0.24

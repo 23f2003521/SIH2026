@@ -1,8 +1,23 @@
+# Note: no [server] port is set here on purpose. Hosted platforms (Hugging Face
+# Spaces, Render, Cloud Run) inject their own port, and a hardcoded value here
+# fights them. run.py passes --server.port explicitly for local use.
+
 [server]
-port = 8501
-headless = false
+headless = true
 enableCORS = false
 enableXsrfProtection = false
+maxUploadSize = 200
 
 [browser]
 gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#31c8e8"
+backgroundColor = "#070d15"
+secondaryBackgroundColor = "#0e1725"
+textColor = "#e6edf6"
+font = "sans serif"
+
+[runner]
+fastReruns = true

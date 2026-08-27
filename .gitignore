@@ -31,3 +31,7 @@ ais-anomaly-detection.ipynb
 .DS_Store
 *.log
 
+# The SAR checkpoint is 105 MB -- over GitHub's 100 MB blob limit. It lives on
+# the Hugging Face Hub and is fetched at runtime via POSEATSEA_WEIGHTS_REPO.
+# The other three artefacts are small (804 KB total) and ARE committed.
+models/best_sar_model.pth

@@ -1,185 +1,202 @@
-# 🛰️ Multimodal Maritime Surveillance & Oil Spill Attribution System
-### *Smart India Hackathon (SIH) — AI-Powered AIS Anomaly Detection & Satellite SAR Oil Spill Attribution*
+# POSEatSea — Oil Spill Detection & Vessel Attribution
+
+**SIH Problem Statement 26143 (NTRO)** — leveraging satellite imagery and AIS data to
+detect oil spills and attribute them to the responsible vessel.
+
+An operations console built around three trained models: a SAR segmenter that finds oil
+in radar imagery, an autoencoder that flags anomalous vessel behaviour, and an LSTM that
+predicts where a vessel should be next. A correlation layer ties their outputs to a
+single place and time and ranks the vessels that could account for an observed slick.
 
 ---
 
-## 📖 1. Project Overview
-This project provides an **end-to-end, multi-stage maritime safety and surveillance system**. It combines:
-1. **Real-time AIS Vessel Telemetry Analysis:** Early warning detection of erratic ship behaviors (grounding risks, engine failure, dangerous drift near shallow reefs).
-2. **Sentinel-1 Satellite SAR Semantic Segmentation:** High-precision computer vision to detect, classify, and measure oil spills vs. natural "look-alikes".
-3. **Automated Multimodal Attribution:** Automatically triggers satellite imagery when an AIS anomaly occurs, confirms if an oil slick is present, and legally attributes the spill to the offending vessel's **MMSI**.
+## Quick start
 
----
-
-## 🔍 2. Background: What We Had vs. What Was Broken
-
-### The Datasets We Started With:
-1. **AIS Trajectory Data (`Maritius_AOI_20200701_0731_full.csv`):**
-   - Contains 27,978 AIS records across 231 vessels around Mauritius in July 2020 during the real-world **MV Wakashio oil spill disaster**.
-2. **Satellite SAR Oil Spill Dataset (`Oil Spill Detection Dataset/`):**
-   - 1,002 training images and 110 testing images from ESA Sentinel-1 SAR satellites annotated into 5 semantic classes.
-
-### The Problem in the Old Code:
-* **In the Old Code (`old_PCA_new (2).ipynb`):**
-  - The model claimed an artificial **0.92 F1-score**.
-  - **The Flaw:** It labeled *every single ping* from the vessel `372711000` (MV Wakashio) across the entire month as an anomaly — even when the ship was sailing normally in open waters between July 1 and July 24!
-  - This caused severe **label leakage**, artificially inflating the metric.
-* **In the Intermediate Code (`ais-anomaly-detection.ipynb`):**
-  - When real-world temporal ground truth was added (labeling only July 25–26 during the actual reef grounding), the unsupervised models (Isolation Forest, LUNAR, Deep SVDD) dropped to **~0.10 global F1** (due to false positives across other ships) and **~0.49 – 0.57 masked F1**.
-
----
-
-## 🚀 3. What We Have Built (The New Solution)
-
-### New Files Created:
-1. [**`multimodal_oil_spill_detection.ipynb`**](multimodal_oil_spill_detection.ipynb): Complete Jupyter Notebook uniting AIS anomaly detection, SAR semantic segmentation, and multimodal attribution.
-2. [**`streamlit_app.py`**](streamlit_app.py): Interactive web demonstration GUI with live trajectory sliders, SAR mask visualizers, and an attribution command center.
-3. [**`models/`**](models/): Serialized pre-trained neural network weights (`sar_unet.pth`, `ais_autoencoder.pth`, `ais_scaler.joblib`, `ais_threshold.json`).
-
----
-
-### Key Technical Improvements:
-
-#### A. 🚢 Module 1: Enhanced AIS Maritime Anomaly Detection
-* **Real-World Temporal Ground Truth:** Evaluates strictly against the grounding crisis window (`2020-07-25` to `2020-07-26 UTC`), eliminating label leakage.
-* **Domain Kinematics & Spatial Risk Features:**
-  - **Course-Heading Drift ($\Delta$):** Measures the angular difference between where the ship points vs. where it actually travels (detecting drift under ocean currents).
-  - **Rate of Turn & Speed Jerk:** Second-order differentials detecting sudden deceleration and hard rudder locks.
-  - **Reef/Coast Proximity Proxy ($D_{\text{reef}}$):** Distance to shallow coral reefs (e.g. Pointe d'Esny reef at $-20.44^\circ, 57.75^\circ$).
-  - **Rolling Volatility:** 5-step rolling standard deviation of speed and course.
-* **Deep Trajectory Autoencoder:** A multi-layer neural network trained on clean baseline traffic under a semi-supervised one-class regime.
-* **Dynamic F1 Maximization:** Precision-Recall curve analysis selects the optimal decision threshold.
-
-#### B. 🛰️ Module 2: Satellite SAR Oil Spill Semantic Segmentation
-* **M4D Benchmark Dataset Loader:** Reads 1,002 training and 110 testing Sentinel-1 SAR scenes with 5 classes:
-  - `Class 0`: **Sea Surface** (Black)
-  - `Class 1`: **Oil Spill** (Cyan)
-  - `Class 2`: **Look-alike** (Red — low wind / biogenic films)
-  - `Class 3`: **Ship Target** (Brown)
-  - `Class 4`: **Land** (Green)
-* **Compound Focal + Dice Loss with Class Weights:**
-  - Standard cross-entropy fails because Sea Surface occupies >90% of image pixels.
-  - Our custom loss penalizes false negatives on `Oil Spill` and `Look-alike` heavily:
-    $$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{Focal}} + 0.6 \cdot \mathcal{L}_{\text{Dice}}$$
-* **Residual U-Net Architecture:** Multi-scale encoder-decoder extracting fine radar backscatter gradients.
-
-#### C. 🚨 Module 3: Multimodal AIS-SAR Fusion & Legal Attribution
-* Connects the real-time kinematic anomaly alert directly to satellite SAR imagery.
-* Automatically queries the SAR scene around the ship's coordinates, runs segmentation, calculates slick area in $\text{km}^2$, and generates an official **Maritime Incident & Legal Attribution Dossier**.
-
----
-
-## 📊 4. Performance Summary
-
-| Metric / Evaluation Area | Previous Baseline | Our New System | Real-World Impact |
-|---|---|---|---|
-| **AIS Grounding Recall** | ~0.72 | **`1.0000` (100.0%)** | **Zero missed alarms** — detected all grounding crisis telemetry pings. |
-| **AIS Anomaly Max F1** | 0.49 – 0.57 | **`0.6059`** | Highest realistic score achieved without label leakage. |
-| **SAR Oil Spill IoU (Class 1)** | ~0.25 (3 epochs) | **`0.4289` (15 epochs)** | High segmentation overlap distinguishing crude oil from look-alikes. |
-| **SAR Test Loss** | 0.5474 | **`0.3526`** | Substantial loss reduction on unseen satellite test scenes. |
-| **End-to-End Attribution** | Non-existent | **Automated** | Instantly ties oil spill polygon to vessel MMSI for legal enforcement. |
-
----
-
-## 🖥️ 5. How to Run and Operate the Streamlit GUI
-
-### Step 1: Launch the Application
-Open your terminal in the project directory and run:
 ```bash
-./venv/bin/streamlit run streamlit_app.py
-```
-*(Or if your virtual environment is activated: `streamlit run streamlit_app.py`)*
+python -m venv venv
+venv\Scripts\activate            # Windows;  source venv/bin/activate on Linux/macOS
+pip install -r requirements.txt
 
-### Step 2: Open in Your Browser
-Navigate to:
-```
-http://localhost:8501
+streamlit run ui/app.py
 ```
 
----
+Opens on <http://localhost:8501>. No internet connection is required at runtime —
+charts render offline and no basemap tiles are fetched.
 
-### Step 3: Navigating the GUI (What You Will See)
+Verify the install:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 🛰️ Multimodal Maritime Oil Spill & AIS Surveillance System                 │
-├──────────────────────────┬──────────────────────────┬───────────────────────┤
-│ 🚢 1. AIS Anomaly Insp. │ 🛰️ 2. SAR Oil Segmenter │ 🚨 3. Multimodal Att. │
-└──────────────────────────┴──────────────────────────┴───────────────────────┘
-```
-
-#### 🚢 Tab 1: AIS Kinematic Anomaly Inspector
-* **What it does:** Allows you to inspect any vessel's voyage telemetry step-by-step.
-* **How to use it:**
-  1. Select a vessel from the **"Select Vessel MMSI"** dropdown (e.g. `372711000` for MV Wakashio).
-  2. Drag the **"Telemetry Timestamp Step"** slider to move along the ship's historical voyage.
-  3. Look at the **Metric Cards**: Speed, Course, Rate of Turn, and Distance to Reef.
-  4. Notice the **Anomaly Assessment Card**:
-     - **Green Banner (`NORMAL CRUISING PROFILE`):** The ship was cruising safely.
-     - **Red Banner (`CRITICAL KINEMATIC ANOMALY DETECTED`):** Flags sudden speed drop, high drift, and dangerous reef proximity.
-  5. The **Trajectory Map** plots the vessel track in blue and highlights the current ping (Green = Safe, Red = Anomaly) relative to the **Pointe d'Esny Coral Reef** (Orange Star).
-
----
-
-#### 🛰️ Tab 2: Satellite SAR Oil Spill Segmenter
-* **What it does:** Runs real-time AI segmentation on Sentinel-1 SAR satellite scenes.
-* **How to use it:**
-  1. Use the **"Select Test SAR Scene"** dropdown to pick any of the 110 unseen test scenes.
-  2. View the **Triple-Panel Display**:
-     - **Panel 1 (Input Sentinel-1 SAR):** Raw radar backscatter imagery from space.
-     - **Panel 2 (Ground Truth Mask):** Verified segmentation from the European Maritime Safety Agency.
-     - **Panel 3 (U-Net Predicted Mask):** Live prediction from our trained neural network.
-  3. **Color Legend:**
-     - ⬛ **Black:** Sea Surface (0)
-     - 🟦 **Cyan:** **Oil Spill (1)**
-     - 🟥 **Red:** **Look-alike (2)** (biogenic slick / low wind)
-     - 🟫 **Brown:** Ship Target (3)
-     - 🟩 **Green:** Land / Coastline (4)
-  4. View the **Scene Composition Card** showing pixel percentages and the **Estimated Slick Area in $\text{km}^2$**.
-
----
-
-#### 🚨 Tab 3: Multimodal Attribution Command Center
-* **What it does:** Demonstrates the end-to-end Smart India Hackathon jury workflow — connecting vessel distress telemetry to satellite imagery to establish legal responsibility.
-* **How to use it:**
-  1. Under **Step 1 (Vessel Telemetry Stream)**, adjust sliders (e.g., Speed = `0.0 kn`, Drift = `54.0°`, Distance to Reef = `0.05 km`).
-  2. Under **Step 2 (Satellite SAR Confirmation)**, select the tasked satellite scene.
-  3. The system computes the anomaly score, segments the satellite image, and generates the **Official Maritime Incident & Attribution Dossier**:
-     - Displays incident timestamp, coordinates, and slick size ($\text{km}^2$).
-     - Sets the **Legal Responsibility Status**:
-       - `CONFIRMED OFFENDER: ATTRIBUTED TO VESSEL MMSI` (when kinematic failure + satellite spill co-occur).
-
----
-
-## 📁 6. Project Directory Structure
-
-```
-SIH/
-├── README.md                              <- Comprehensive project guide (this file)
-├── streamlit_app.py                       <- Interactive multi-tab demonstration web app
-├── multimodal_oil_spill_detection.ipynb   <- Complete end-to-end trained Jupyter Notebook
-│
-├── models/                                <- Serialized pre-trained models
-│   ├── ais_autoencoder.pth                <- PyTorch Deep Trajectory Autoencoder weights
-│   ├── ais_scaler.joblib                  <- Feature normalization scaler
-│   ├── ais_threshold.json                 <- Optimal F1 decision threshold
-│   └── sar_unet.pth                       <- PyTorch 5-class SAR Oil Spill U-Net weights
-│
-├── Maritius_AOI_20200701_0731_full.csv    <- Mauritius AIS vessel telemetry dataset
-├── Oil Spill Detection Dataset/           <- Sentinel-1 SAR benchmark dataset
-│   ├── README.txt
-│   ├── train/                             <- 1,002 training SAR scenes & masks
-│   └── test/                              <- 110 testing SAR scenes & masks
-│
-├── venv/                                  <- Python 3.12 Virtual Environment
-├── app.py / app1.py                       <- Legacy experimental scripts
-├── old_PCA_new (2).ipynb                  <- Legacy baseline notebook (with label leakage)
-└── ais-anomaly-detection.ipynb            <- Intermediate baseline notebook
+```bash
+pytest tests/ -q          # 37 tests: models, guard rails, API contract, every page
 ```
 
 ---
 
-## 💡 7. Summary for Hackathon Presentations
-* **The Core Innovation:** Combining high-frequency AIS time-series telemetry with spaceborne Synthetic Aperture Radar (SAR) imagery creates a closed-loop maritime disaster response system.
-* **The Key Advantage:** AIS anomaly detection provides **instant early warnings** (before oil even touches the water), while satellite SAR semantic segmentation provides **irrefutable visual confirmation and legal attribution**.
+## What the console shows
 
+| Page | What it does |
+|---|---|
+| **Incident console** | The whole story on one screen — traffic, flags, and the attributed vessel. |
+| **SAR segmentation** | Upload a Sentinel-1 scene; get a 5-class mask, area estimate and slick breakdown. |
+| **AIS anomalies** | Per-ping anomaly scoring across the fleet, down to which feature drove each flag. |
+| **Trajectory** | Predicted next position against the vessel's actual track, with a deviation trace. |
+| **Attribution** | Ranks candidate vessels against a slick, showing every component of the score. |
+| **System** | Model residency, load timings, reported accuracy, and declared limitations. |
+
+---
+
+## Architecture
+
+```
+poseatsea/
+  config.py              every constant the weights depend on, in one place
+  registry.py            lazy, thread-safe, instrumented model registry
+  fusion.py              spill-to-vessel correlation and ranking
+  inference/
+    sar.py               U-Net + MiT-B2 segmentation
+    trajectory.py        LSTM next-position + operating-envelope guard
+    ais.py               autoencoder anomaly scoring + feature engineering
+  scenario/
+    wakashio.py          reconstructed MV Wakashio incident
+    synthetic_sar.py     synthetic radar frames (plumbing test only)
+api/main.py              optional FastAPI inference service
+ui/                      Streamlit console (engine, theme, charts, views)
+tests/                   pipeline, API and page smoke tests
+```
+
+### Carrying the heavy models
+
+The SAR segmenter is a 110 MB MiT-B2 SegFormer: several seconds to build and a few
+hundred MB resident. Streamlit re-executes its whole script on every widget
+interaction, so naive loading would rebuild it on every click.
+
+`poseatsea/registry.py` gives the process exactly one instance of each model:
+
+- **Lazy** — a session that only touches AIS never pays for the SAR encoder.
+  Model residency is visible live in the sidebar.
+- **Locked per model** — concurrent first-touches load once, not *N* times, and
+  inference is serialised because the eval-mode modules are shared mutable state.
+- **Instrumented** — load time and parameter counts are surfaced on the System page
+  rather than hidden.
+- **Strict** — every `state_dict` loads with `strict=True`, so an architecture drift
+  becomes a startup error instead of a quietly wrong answer.
+
+Streamlit's `st.cache_resource` wraps the registry; `st.cache_data` memoises the
+derived analytics. The optional FastAPI service imports the *same* inference modules
+and the *same* registry, so there is one implementation of each model's behaviour and
+no way for the two front doors to disagree.
+
+```bash
+uvicorn api.main:app --port 8000     # docs at /docs
+```
+
+Use it when in-process loading stops being viable: several analysts sharing one GPU,
+a UI that restarts without repaying the load, or a non-Streamlit consumer.
+
+---
+
+## The models
+
+| Model | Architecture | Verified against checkpoint |
+|---|---|---|
+| SAR segmenter | U-Net, `mit_b2` encoder, 5 classes | `patch_embed{1,2,3}` channel progression 64→128→320 |
+| Trajectory | LSTM(6→128) × 2 + Linear(128→2) | `lstm.weight_ih_l0` = (512, 6) |
+| AIS anomaly | Autoencoder 11→16→8→4→8→16→11 | encoder/decoder layer shapes |
+
+The AIS model **requires** its `StandardScaler`. It was trained on standardised
+features and returns confident nonsense on raw input — `tests/test_pipeline.py`
+asserts that skipping the scaler changes the answer by two orders of magnitude.
+
+### Reported performance
+
+- **AIS anomaly** — precision 0.930, recall 0.408, F1 0.567, threshold 1.104481.
+  Deliberately precision-heavy: when it fires it is almost always right, but it misses
+  roughly six anomalies in ten. Every surface says *flagged for review*, never
+  *confirmed violation*.
+- **Trajectory** — mean error 0.37 km, median 0.19 km, p90 0.63 km on unseen vessels.
+
+### Measured operating envelope
+
+Beyond the published figures, the trajectory checkpoint was probed directly. Two
+limits emerged, and both are enforced in code rather than left to be discovered:
+
+- **Cadence** — step size is reproduced well at ~60 s ping intervals. At 5-minute
+  spacing the predicted step falls below half the true distance travelled.
+- **Heading** — bearing error is small along the NE–SW lane (courses near 045° and
+  225°), which dominates traffic in the training region. On NW–SE headings the model
+  frequently predicts close to the *reverse* bearing. Such windows are marked
+  *degraded* in the UI.
+
+Out-of-AOI input is refused outright rather than answered wrongly.
+
+---
+
+## Demonstration data
+
+No AIS feed or SAR imagery was supplied with the models, so the console ships with a
+**reconstruction of the MV Wakashio grounding** (Pointe d'Esny, Mauritius,
+25 July 2020) — the case study named in the project brief, and the same water and
+month the trajectory model was normalised for.
+
+Vessel particulars, voyage, grounding position and timing follow the public casualty
+record. **The individual AIS pings are physically consistent synthesis, not recovered
+signal.** Tracks are generated from waypoints with a speed profile; course, rate of
+turn and positional deltas are all derived from the resulting geometry, so every field
+the models consume agrees with every other one. The console labels this on every page.
+
+The scenario also carries five contemporaneous vessels, which is what makes the
+demonstration honest — attribution only means something if the system had innocent
+traffic available to blame and did not blame it.
+
+One deliberate result: **an inshore trawler carries the highest raw anomaly score in
+the window, not the casualty.** Tight repeated turns are kinematically anomalous and
+entirely lawful. Behaviour alone would nominate the wrong vessel; only correlation with
+the spill's position resolves it. That is the argument for fusion, made concrete.
+
+### SAR imagery — read this before demoing
+
+The synthetic radar generator (`scenario/synthetic_sar.py`) is a **plumbing test, not
+imagery**. Those frames are out of distribution for the segmenter, which responds to
+them almost identically regardless of what was drawn — the clean-sea control returns
+*more* oil pixels than the slick scenes. They prove the model loads and runs; they say
+nothing about accuracy.
+
+**For a real demonstration, supply Sentinel-1 scenes** from the Krestenitis et al.
+oil-spill benchmark the weights were trained on (1002 train / 110 test). Any file from
+its `test/images/` folder is a valid input to the upload path.
+
+---
+
+## Declared limitations
+
+1. **No drift or hindcast modelling.** Attribution assumes the slick lies where it was
+   observed. There is no ocean-current or wind model here. Faking one would be worse
+   than omitting it — a plausible backtrack with no physics behind it would send an
+   investigation to the wrong vessel with false confidence. Wiring in real drift data
+   (for example INCOIS current products) would replace the fixed search radius with a
+   time-reversed probability field; that is the natural next component.
+2. **The trajectory model is regional.** Valid only inside the Mauritius AOI it was
+   normalised for. Elsewhere requires retraining.
+3. **The anomaly detector misses more than it catches.** Recall 0.41. It nominates
+   vessels for review; it cannot clear one.
+4. **Area estimates are approximate.** The mask is a 256×256 resample of the source
+   scene, and ground resolution is an operator-supplied assumption.
+5. **The demonstration AIS is reconstructed**, as described above.
+6. **Attribution weights are a policy choice, not a measurement**, and are exposed in
+   the UI so they can be argued with.
+
+---
+
+## Attribution scoring
+
+A transparent weighted sum, not a learned model — every component is returned
+alongside the total so an analyst can see why a vessel ranked where it did.
+
+| Component | Weight | Measures |
+|---|---|---|
+| Proximity | 0.40 | Closest approach to the observed slick |
+| Anomaly | 0.30 | Peak reconstruction error *while near the slick* |
+| Dwell | 0.20 | Share of its observed time spent inside the radius |
+| Deviation | 0.10 | Worst departure from its predicted track |
+
+Anomalies only count as evidence if they occurred near the slick — which is precisely
+what clears the trawler.

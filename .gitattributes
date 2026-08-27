@@ -1,0 +1,11 @@
+# Keep line endings sane across Windows/Linux checkouts.
+*.py   text eol=lf
+*.md   text eol=lf
+*.toml text eol=lf
+*.txt  text eol=lf
+
+# Note: no Git LFS rules. The three small model artefacts (804 KB combined) are
+# committed directly. The 105 MB SAR checkpoint is deliberately NOT in this repo
+# -- it exceeds GitHub's 100 MB blob limit and Streamlit Cloud cannot resolve LFS
+# pointers anyway, so it is fetched from the Hugging Face Hub at runtime.
+# See poseatsea/weights.py and deploy/DEPLOY.md.

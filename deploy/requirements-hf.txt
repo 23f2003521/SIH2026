@@ -1,0 +1,35 @@
+# Requirements for Hugging Face Spaces (Linux, Python 3.10/3.11).
+#
+# Copy this to requirements.txt at the ROOT of the Space repo -- it replaces the
+# local one. Differences from the local file, and why:
+#
+#   * CPU-only torch. Plain `torch` on Linux pulls ~2.5 GB of CUDA wheels that a
+#     free CPU Space cannot use and may not have room for.
+#   * Ranges, not exact pins. The local file is pinned to what resolved on
+#     Windows / Python 3.14; those exact versions may not have wheels here.
+#   * scikit-learn pinned to 1.6.1 -- the version the AIS scaler was pickled
+#     with. Exact match removes the InconsistentVersionWarning entirely.
+#   * No pytest: tests do not run in the Space.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch>=2.2,<3
+segmentation-models-pytorch>=0.3.3
+timm>=0.9
+
+scikit-learn==1.6.1
+joblib>=1.3
+
+numpy>=1.26,<3
+pandas>=2.0
+opencv-python-headless>=4.8
+pillow>=10.0
+
+# streamlit is NOT listed here on purpose -- the Space's `sdk_version` in
+# README.md controls it. Pinning it in both places makes pip and the Space
+# builder install different versions.
+altair>=5.0
+
+# Only needed if the weights are fetched from the Hub rather than committed via
+# LFS (i.e. if you set POSEATSEA_WEIGHTS_REPO). Harmless to leave installed.
+huggingface-hub>=0.24

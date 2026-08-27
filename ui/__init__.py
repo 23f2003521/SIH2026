@@ -1,0 +1,1 @@
+"""POSEatSea Streamlit console."""
