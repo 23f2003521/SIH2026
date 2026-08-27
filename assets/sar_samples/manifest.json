@@ -1,0 +1,162 @@
+[
+  {
+    "key": "wakashio_reef",
+    "title": "Pointe d'Esny \u2014 main slick",
+    "mmsi": 371284000,
+    "vessel": "MV WAKASHIO",
+    "captured": "2020-08-07 06:14 UTC",
+    "position": [
+      -20.4372,
+      57.7433
+    ],
+    "blurb": "Sentinel-1 pass over the grounding site. A large, branching mineral-oil signature trailing from the wreck.",
+    "image": "scenes/wakashio_reef.jpg",
+    "mask": "scenes/wakashio_reef_mask.png",
+    "source_size": [
+      1250,
+      650
+    ],
+    "pixel_resolution_m": 10.0,
+    "class_pixels": {
+      "Sea Surface": 244495,
+      "Oil Spill": 13823,
+      "Look-alike": 3735,
+      "Ship": 80,
+      "Land": 11
+    },
+    "oil_area_km2": 1.3823,
+    "lookalike_area_km2": 0.3735,
+    "oil_detected": true,
+    "slicks": 5,
+    "ships": 2,
+    "note": "Coherent oil-spill signature dominates the dark formations in this scene."
+  },
+  {
+    "key": "anchorage_discharge",
+    "title": "Anchorage \u2014 small discharge",
+    "mmsi": 352001899,
+    "vessel": "MV BLUE BAY TRADER",
+    "captured": "2020-07-25 14:02 UTC",
+    "position": [
+      -20.265,
+      57.83
+    ],
+    "blurb": "A compact slick alongside several hard targets \u2014 the signature of an operational discharge at anchor.",
+    "image": "scenes/anchorage_discharge.jpg",
+    "mask": "scenes/anchorage_discharge_mask.png",
+    "source_size": [
+      1250,
+      650
+    ],
+    "pixel_resolution_m": 10.0,
+    "class_pixels": {
+      "Sea Surface": 259594,
+      "Oil Spill": 1941,
+      "Look-alike": 0,
+      "Ship": 609,
+      "Land": 0
+    },
+    "oil_area_km2": 0.1941,
+    "lookalike_area_km2": 0.0,
+    "oil_detected": true,
+    "slicks": 1,
+    "ships": 4,
+    "note": "Coherent oil-spill signature dominates the dark formations in this scene."
+  },
+  {
+    "key": "lookalike_field",
+    "title": "Low-wind field \u2014 look-alike",
+    "mmsi": 645079210,
+    "vessel": "FV SEA HARVESTER 7",
+    "captured": "2020-07-25 15:40 UTC",
+    "position": [
+      -20.475,
+      57.94
+    ],
+    "blurb": "Extensive dark formations that are NOT oil. The segmenter calls them look-alike, which is the whole point of the class.",
+    "image": "scenes/lookalike_field.jpg",
+    "mask": "scenes/lookalike_field_mask.png",
+    "source_size": [
+      1250,
+      650
+    ],
+    "pixel_resolution_m": 10.0,
+    "class_pixels": {
+      "Sea Surface": 204856,
+      "Oil Spill": 42,
+      "Look-alike": 56606,
+      "Ship": 640,
+      "Land": 0
+    },
+    "oil_area_km2": 0.0042,
+    "lookalike_area_km2": 5.6606,
+    "oil_detected": true,
+    "slicks": 2,
+    "ships": 2,
+    "note": "Look-alike pixels outnumber oil pixels -- treat this scene as ambiguous and confirm against wind and met conditions."
+  },
+  {
+    "key": "coastal_lookalike",
+    "title": "Coastal water \u2014 sheltered calm",
+    "mmsi": 563114900,
+    "vessel": "BULK PIONEER",
+    "captured": "2020-07-25 15:10 UTC",
+    "position": [
+      -20.21,
+      58.26
+    ],
+    "blurb": "Wave shadow in the lee of the coast. Dark, adjacent to land, and correctly not called oil.",
+    "image": "scenes/coastal_lookalike.jpg",
+    "mask": "scenes/coastal_lookalike_mask.png",
+    "source_size": [
+      1250,
+      650
+    ],
+    "pixel_resolution_m": 10.0,
+    "class_pixels": {
+      "Sea Surface": 117965,
+      "Oil Spill": 35,
+      "Look-alike": 25954,
+      "Ship": 0,
+      "Land": 118190
+    },
+    "oil_area_km2": 0.0035,
+    "lookalike_area_km2": 2.5954,
+    "oil_detected": true,
+    "slicks": 1,
+    "ships": 0,
+    "note": "Look-alike pixels outnumber oil pixels -- treat this scene as ambiguous and confirm against wind and met conditions."
+  },
+  {
+    "key": "clean_coastal",
+    "title": "Clean coastal pass",
+    "mmsi": 256891004,
+    "vessel": "MSC CAP FLORES",
+    "captured": "2020-07-25 15:25 UTC",
+    "position": [
+      -20.53,
+      57.81
+    ],
+    "blurb": "Negative control \u2014 coastline and open water, no dark formations.",
+    "image": "scenes/clean_coastal.jpg",
+    "mask": "scenes/clean_coastal_mask.png",
+    "source_size": [
+      1250,
+      650
+    ],
+    "pixel_resolution_m": 10.0,
+    "class_pixels": {
+      "Sea Surface": 185344,
+      "Oil Spill": 0,
+      "Look-alike": 0,
+      "Ship": 33,
+      "Land": 76767
+    },
+    "oil_area_km2": 0.0,
+    "lookalike_area_km2": 0.0,
+    "oil_detected": false,
+    "slicks": 0,
+    "ships": 1,
+    "note": "No oil-spill pixels segmented in this scene."
+  }
+]

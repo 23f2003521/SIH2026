@@ -1,4 +1,5 @@
 """Reconstructed incident scenarios used to exercise the pipeline."""
+from . import sar_scenes  # noqa: F401
 from .wakashio import (  # noqa: F401
     INCIDENT,
     build_scenario,

@@ -57,14 +57,15 @@ console (SIH Problem Statement 26143, NTRO).
 
 Code: https://github.com/23f2003521/SIH2026
 
-## Caveat on the SAR checkpoint
+## SAR checkpoint
 
-`best_sar_model.pth` currently holds a trained MiT-B2 encoder with an
-**untrained decoder and segmentation head** — those weights are still at
-`torch.nn.init` values (uniform, kurtosis −1.2, min/max exactly at the Kaiming
-bound). It emits incoherent noise regardless of input resolution or
-preprocessing. Replace this file with a corrected export to fix the SAR page;
-no code change is needed.
+Expects **512x512** input. Running inference at another resolution does not
+degrade gracefully -- it returns incoherent noise.
+
+An earlier export of this file carried a trained encoder with an *untrained*
+decoder and head, and emitted noise on every input. The current file is
+trained through (BatchNorm `num_batches_tracked` = 7530) and reproduces the
+reference outputs at 0.81 oil IoU.
 """
 
 

@@ -37,3 +37,10 @@ ais-anomaly-detection.ipynb
 # the Hugging Face Hub and is fetched at runtime via POSEATSEA_WEIGHTS_REPO.
 # The other three artefacts are small (804 KB total) and ARE committed.
 models/best_sar_model.pth
+
+# The curated SAR scene library IS part of the app: five real Sentinel-1 scenes
+# plus the masks the shipped checkpoint produced for them. The blanket *.jpg /
+# *.png rules above are for datasets, not these.
+!assets/sar_samples/scenes/*.jpg
+!assets/sar_samples/scenes/*.png
+assets/sar_samples/raw/

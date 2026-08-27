@@ -234,3 +234,81 @@ def test_scenario_is_deterministic():
 def test_every_vessel_stays_inside_the_aoi(scenario):
     for row in scenario["ais"].itertuples():
         assert traj_mod.in_aoi(row.latitude, row.longitude), f"{row.vessel_name} left the AOI"
+
+
+# --------------------------------------------------------------------------
+# Curated SAR scene library
+# --------------------------------------------------------------------------
+def test_scene_library_loads():
+    from poseatsea.scenario import sar_scenes
+    scenes = sar_scenes.load_scenes()
+    assert len(scenes) == 5
+    for s in scenes:
+        assert s.image_path.exists(), f"{s.key}: source scene missing"
+        assert s.mask_path.exists(), f"{s.key}: precomputed mask missing"
+
+
+def test_precomputed_masks_match_live_inference():
+    """
+    The stored masks must be what the shipped checkpoint actually produces.
+    If someone swaps the weights without re-running build_sar_scenes.py, the
+    library silently starts lying -- this catches that.
+    """
+    from poseatsea.inference import sar as sar_mod
+    from poseatsea.scenario import sar_scenes
+
+    model = get_registry()["sar"].get()
+    for scene in sar_scenes.load_scenes():
+        live = sar_mod.segment(model, scene.load_image()).mask
+        stored = scene.load_mask()
+        assert stored.shape == live.shape, f"{scene.key}: shape drift"
+        agreement = float((stored == live).mean())
+        assert agreement > 0.99, f"{scene.key}: stored mask differs from live ({agreement:.3f})"
+
+
+def test_scene_masks_are_coherent_not_noise():
+    """
+    The old checkpoint emitted salt-and-pepper noise. A real segmentation has
+    large contiguous regions, so horizontal class changes stay rare.
+    """
+    from poseatsea.scenario import sar_scenes
+    for scene in sar_scenes.load_scenes():
+        m = scene.load_mask()
+        churn = float((m[:, 1:] != m[:, :-1]).mean())
+        assert churn < 0.08, f"{scene.key}: mask looks like noise (churn {churn:.3f})"
+
+
+def test_library_separates_oil_from_lookalike():
+    """The library must contain both a real spill and a convincing non-spill."""
+    from poseatsea.scenario import sar_scenes
+    scenes = {s.key: s for s in sar_scenes.load_scenes()}
+
+    wakashio = scenes["wakashio_reef"]
+    assert wakashio.oil_detected and wakashio.oil_area_km2 > 1.0
+
+    lookalike = scenes["lookalike_field"]
+    assert lookalike.oil_area_km2 < 0.05
+    assert lookalike.lookalike_area_km2 > 1.0
+
+    assert scenes["clean_coastal"].oil_area_km2 == 0.0
+
+
+def test_every_scene_maps_to_a_real_vessel(scenario):
+    from poseatsea.scenario import sar_scenes
+    known = set(scenario["ais"]["mmsi"].unique())
+    for s in sar_scenes.load_scenes():
+        assert s.mmsi in known, f"{s.key} references unknown MMSI {s.mmsi}"
+        assert sar_scenes.by_mmsi(s.mmsi).key == s.key
+
+
+def test_sar_checkpoint_is_trained():
+    """
+    The first checkpoint shipped with an untrained decoder and emitted noise.
+    BatchNorm running statistics are the tell: never updated means never
+    trained through.
+    """
+    import torch
+    from poseatsea.config import SAR_WEIGHTS
+    sd = torch.load(SAR_WEIGHTS, map_location="cpu")
+    tracked = {int(v) for k, v in sd.items() if k.endswith("num_batches_tracked")}
+    assert tracked and max(tracked) > 0, "SAR decoder BatchNorm was never trained"
