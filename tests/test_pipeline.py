@@ -321,29 +321,42 @@ def test_library_separates_oil_from_lookalike():
     from poseatsea.scenario import sar_scenes
     scenes = {s.key: s for s in sar_scenes.load_scenes()}
 
-    wakashio = scenes["wakashio_reef"]
-    assert wakashio.oil_detected and wakashio.oil_area_km2 > 1.0
+    assert scenes["wakashio_reef"].oil_detected
+    assert scenes["wakashio_reef"].oil_area_km2 > 1.0
 
-    lookalike = scenes["lookalike_field"]
+    lookalike = scenes["very_maria_pass"]
     assert lookalike.oil_area_km2 < 0.05
     assert lookalike.lookalike_area_km2 > 1.0
 
-    assert scenes["clean_coastal"].oil_area_km2 == 0.0
+    assert scenes["palona_pass"].oil_area_km2 == 0.0
 
 
-def test_only_the_casualty_is_attributed_to_a_vessel(scenario):
-    """
-    Every other ship in this feed is real, named and innocent. Pinning an oil
-    signature on one of them would be indefensible, so only the Wakashio scene
-    names a vessel.
-    """
+def test_every_scene_names_a_vessel_from_the_real_feed(scenario):
+    """Scene vessels must exist in the AIS feed, not be invented for the demo."""
     from poseatsea.scenario import sar_scenes
     known = set(scenario["ais"]["mmsi"].unique())
-    attributed = [s for s in sar_scenes.load_scenes() if s.attributed]
-    assert len(attributed) == 1
-    assert attributed[0].mmsi == WAKASHIO_MMSI
-    assert attributed[0].mmsi in known
+    scenes = sar_scenes.load_scenes()
+    assert len(scenes) == 5
+    for sc in scenes:
+        assert sc.mmsi in known, f"{sc.key} names MMSI {sc.mmsi}, absent from the feed"
+        assert sar_scenes.by_mmsi(sc.mmsi).key == sc.key
     assert sar_scenes.by_mmsi(WAKASHIO_MMSI).key == "wakashio_reef"
+
+
+def test_only_the_casualty_scene_carries_a_major_slick(scored):
+    """
+    Naming innocent vessels is fine; implying they spilled is not. Only the
+    casualty's scene may show a major slick, and any vessel whose scene does
+    show oil must still be cleared by its own AIS.
+    """
+    from poseatsea.scenario import sar_scenes
+    for sc in sar_scenes.load_scenes():
+        if sc.mmsi == WAKASHIO_MMSI:
+            assert sc.oil_area_km2 > 1.0
+            continue
+        assert sc.oil_area_km2 < 0.5, f"{sc.vessel} must not carry a major slick"
+        track = scored[scored["mmsi"] == sc.mmsi]
+        assert track["is_anomaly"].mean() < 0.05, f"{sc.vessel} should read as clean"
 
 
 def test_sar_checkpoint_is_trained():

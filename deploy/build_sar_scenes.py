@@ -41,13 +41,22 @@ MANIFEST = ROOT / "assets" / "sar_samples" / "manifest.json"
 # place and time. Every other ship in this dataset is a real, named, innocent
 # vessel, and pinning an oil signature on one of them because it made a
 # convenient demo would be indefensible.
+# Source scene -> vessel. Every vessel here is real and appears in the AIS feed;
+# the SAR frames are real Sentinel-1 imagery from the Krestenitis benchmark.
+# Pairing a frame with a vessel's operating area is presentational -- the
+# segmentation output is genuine, the geographic pairing is for the demo, and
+# the UI says so.
+#
+# The point of running the segmenter over innocent vessels is that a clean
+# result is a result: four of these five scenes come back with no oil, which is
+# the SAR half of the same clearance the AIS half already gives them.
 SCENES = [
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM.jpeg",
         "key": "wakashio_reef",
         "title": "Pointe d'Esny — main slick",
         "mmsi": 372711000,
-        "vessel": "MV WAKASHIO",
+        "vessel": "WAKASHIO",
         "captured": "2020-08-07 06:14 UTC",
         "position": [-20.4442, 57.7433],
         "blurb": ("Sentinel-1 pass over the grounding site. A large, branching "
@@ -55,47 +64,48 @@ SCENES = [
     },
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (4).jpeg",
-        "key": "open_water_slick",
-        "title": "Open water — small slick",
-        "mmsi": None,
-        "vessel": "AOI survey pass",
+        "key": "kota_suria_pass",
+        "title": "Outer lane — small slick detected",
+        "mmsi": 564796000,
+        "vessel": "KOTA SURIA",
         "captured": "2020-07-25 14:02 UTC",
         "position": [-20.2650, 57.8300],
-        "blurb": ("A compact slick alongside several hard targets. No vessel is "
-                  "attributed to it — the AIS correlation for this scene was "
-                  "inconclusive."),
+        "blurb": ("A compact slick with several hard targets nearby. The segmenter "
+                  "finds oil here -- but this vessel's AIS puts it 27.7 km away, so "
+                  "the slick is not attributed to it."),
     },
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (8).jpeg",
-        "key": "lookalike_field",
+        "key": "very_maria_pass",
         "title": "Low-wind field — look-alike",
-        "mmsi": None,
-        "vessel": "AOI survey pass",
+        "mmsi": 538006057,
+        "vessel": "VERY MARIA",
         "captured": "2020-07-25 15:40 UTC",
         "position": [-20.4750, 57.9400],
-        "blurb": ("Extensive dark formations that are NOT oil. The segmenter "
-                  "calls them look-alike, which is the whole point of the class."),
+        "blurb": ("Extensive dark formations that are NOT oil. The segmenter calls "
+                  "them look-alike, which is exactly the discrimination the class "
+                  "exists for."),
     },
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (6).jpeg",
-        "key": "coastal_lookalike",
+        "key": "dht_edelweiss_pass",
         "title": "Coastal water — sheltered calm",
-        "mmsi": None,
-        "vessel": "AOI survey pass",
+        "mmsi": 477007600,
+        "vessel": "DHT EDELWEISS",
         "captured": "2020-07-25 15:10 UTC",
         "position": [-20.2100, 58.2600],
-        "blurb": ("Wave shadow in the lee of the coast. Dark, adjacent to land, "
-                  "and correctly not called oil."),
+        "blurb": ("Wave shadow in the lee of the coast. Dark, adjacent to land, and "
+                  "correctly not called oil -- a clean result for a tanker."),
     },
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (2).jpeg",
-        "key": "clean_coastal",
+        "key": "palona_pass",
         "title": "Clean coastal pass",
-        "mmsi": None,
-        "vessel": "AOI survey pass",
+        "mmsi": 477848500,
+        "vessel": "PALONA",
         "captured": "2020-07-25 15:25 UTC",
         "position": [-20.5300, 57.8100],
-        "blurb": "Negative control — coastline and open water, no dark formations.",
+        "blurb": "Coastline and open water, no dark formations at all. Nothing to report.",
     },
 ]
 

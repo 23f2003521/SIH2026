@@ -162,9 +162,26 @@ casualty record and live in `scenario/wakashio.py`.
 **SAR.** Five real Sentinel-1 scenes with the masks the shipped checkpoint
 produced for them, precomputed by `deploy/build_sar_scenes.py` so the page
 renders without loading the 110 MB segmenter. Uploading a scene runs the model
-live. Only the Wakashio scene names a vessel — every other ship in the feed is
-real, named and innocent, and pinning an oil signature on one of them to make a
-neater demo would be indefensible.
+live.
+
+Each scene names a real vessel from the feed and is cross-referenced against
+that vessel's own AIS result, which is where the two halves meet:
+
+| Vessel | SAR oil | AIS flagged | Distance to slick | Verdict |
+|---|---|---|---|---|
+| **WAKASHIO** | **1.38 km²** | 209 pings | 0.0 km | **Primary suspect** |
+| KOTA SURIA | 0.19 km² | 1 ping | 27.7 km | Cleared by proximity |
+| VERY MARIA | none | 0 | 30.1 km | Cleared |
+| DHT EDELWEISS | none | 0 | 28.3 km | Cleared |
+| PALONA | none | 0 | 44.9 km | Cleared |
+
+The KOTA SURIA row is the useful one: the segmenter *does* find oil in that
+scene and the detector *did* flag one of its pings, yet the vessel was 27.7 km
+away and is cleared. Neither model alone gets that right.
+
+The SAR frames come from the Krestenitis benchmark, so pairing one with a
+vessel's operating area is presentational — the segmentation output is genuine,
+the geographic pairing is for the demo, and the UI states this.
 
 ## Declared limitations
 

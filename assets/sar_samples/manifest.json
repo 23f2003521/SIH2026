@@ -3,7 +3,7 @@
     "key": "wakashio_reef",
     "title": "Pointe d'Esny \u2014 main slick",
     "mmsi": 372711000,
-    "vessel": "MV WAKASHIO",
+    "vessel": "WAKASHIO",
     "captured": "2020-08-07 06:14 UTC",
     "position": [
       -20.4442,
@@ -32,18 +32,18 @@
     "note": "Coherent oil-spill signature dominates the dark formations in this scene."
   },
   {
-    "key": "open_water_slick",
-    "title": "Open water \u2014 small slick",
-    "mmsi": null,
-    "vessel": "AOI survey pass",
+    "key": "kota_suria_pass",
+    "title": "Outer lane \u2014 small slick detected",
+    "mmsi": 564796000,
+    "vessel": "KOTA SURIA",
     "captured": "2020-07-25 14:02 UTC",
     "position": [
       -20.265,
       57.83
     ],
-    "blurb": "A compact slick alongside several hard targets. No vessel is attributed to it \u2014 the AIS correlation for this scene was inconclusive.",
-    "image": "scenes/open_water_slick.jpg",
-    "mask": "scenes/open_water_slick_mask.png",
+    "blurb": "A compact slick with several hard targets nearby. The segmenter finds oil here -- but this vessel's AIS puts it 27.7 km away, so the slick is not attributed to it.",
+    "image": "scenes/kota_suria_pass.jpg",
+    "mask": "scenes/kota_suria_pass_mask.png",
     "source_size": [
       1250,
       650
@@ -64,18 +64,18 @@
     "note": "Coherent oil-spill signature dominates the dark formations in this scene."
   },
   {
-    "key": "lookalike_field",
+    "key": "very_maria_pass",
     "title": "Low-wind field \u2014 look-alike",
-    "mmsi": null,
-    "vessel": "AOI survey pass",
+    "mmsi": 538006057,
+    "vessel": "VERY MARIA",
     "captured": "2020-07-25 15:40 UTC",
     "position": [
       -20.475,
       57.94
     ],
-    "blurb": "Extensive dark formations that are NOT oil. The segmenter calls them look-alike, which is the whole point of the class.",
-    "image": "scenes/lookalike_field.jpg",
-    "mask": "scenes/lookalike_field_mask.png",
+    "blurb": "Extensive dark formations that are NOT oil. The segmenter calls them look-alike, which is exactly the discrimination the class exists for.",
+    "image": "scenes/very_maria_pass.jpg",
+    "mask": "scenes/very_maria_pass_mask.png",
     "source_size": [
       1250,
       650
@@ -96,18 +96,18 @@
     "note": "Look-alike pixels outnumber oil pixels -- treat this scene as ambiguous and confirm against wind and met conditions."
   },
   {
-    "key": "coastal_lookalike",
+    "key": "dht_edelweiss_pass",
     "title": "Coastal water \u2014 sheltered calm",
-    "mmsi": null,
-    "vessel": "AOI survey pass",
+    "mmsi": 477007600,
+    "vessel": "DHT EDELWEISS",
     "captured": "2020-07-25 15:10 UTC",
     "position": [
       -20.21,
       58.26
     ],
-    "blurb": "Wave shadow in the lee of the coast. Dark, adjacent to land, and correctly not called oil.",
-    "image": "scenes/coastal_lookalike.jpg",
-    "mask": "scenes/coastal_lookalike_mask.png",
+    "blurb": "Wave shadow in the lee of the coast. Dark, adjacent to land, and correctly not called oil -- a clean result for a tanker.",
+    "image": "scenes/dht_edelweiss_pass.jpg",
+    "mask": "scenes/dht_edelweiss_pass_mask.png",
     "source_size": [
       1250,
       650
@@ -128,18 +128,18 @@
     "note": "Look-alike pixels outnumber oil pixels -- treat this scene as ambiguous and confirm against wind and met conditions."
   },
   {
-    "key": "clean_coastal",
+    "key": "palona_pass",
     "title": "Clean coastal pass",
-    "mmsi": null,
-    "vessel": "AOI survey pass",
+    "mmsi": 477848500,
+    "vessel": "PALONA",
     "captured": "2020-07-25 15:25 UTC",
     "position": [
       -20.53,
       57.81
     ],
-    "blurb": "Negative control \u2014 coastline and open water, no dark formations.",
-    "image": "scenes/clean_coastal.jpg",
-    "mask": "scenes/clean_coastal_mask.png",
+    "blurb": "Coastline and open water, no dark formations at all. Nothing to report.",
+    "image": "scenes/palona_pass.jpg",
+    "mask": "scenes/palona_pass_mask.png",
     "source_size": [
       1250,
       650

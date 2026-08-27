@@ -72,29 +72,82 @@ def _library_view() -> None:
         "warn" if scene.lookalike_area_km2 > 0.5 else "good")
     theme.banner(f"<b>{scene.verdict()}</b> {scene.note}", tone)
 
-    st.markdown(
-        f"""
-<div class="pos-card tight">
-  <span class="pos-label">Associated vessel</span>
-  <div style="display:flex;gap:.8rem;align-items:center;flex-wrap:wrap;margin-top:.2rem">
-    <b>{scene.vessel}</b>
-    <span class="mono" style="color:{theme.MUTED}">MMSI {scene.mmsi} &middot;
-      {scene.position[0]:.4f}, {scene.position[1]:.4f} &middot; {scene.captured}</span>
-  </div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
+    _vessel_crossref(scene)
 
     _imagery(image, mask, alpha, scene.class_pixels, scene.pixel_resolution_m)
     _legend()
 
     theme.provenance(
-        f"Real Sentinel-1 scene at {scene.source_size[0]}×{scene.source_size[1]}. The mask is "
-        f"the shipped checkpoint's own output, precomputed at {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE} "
-        f"so the page renders without loading the 110 MB segmenter. Area figures are "
-        f"approximate — the mask is a resample of the source scene, and ground resolution "
-        f"is an assumption."
+        f"Real Sentinel-1 scene at {scene.source_size[0]}×{scene.source_size[1]} from the "
+        f"Krestenitis benchmark; the mask is the shipped checkpoint's own output, precomputed "
+        f"at {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE} so the page renders without loading the 110 MB "
+        f"segmenter. Pairing a scene with a vessel's operating area is a presentational "
+        f"choice — the segmentation is genuine, the geographic pairing is for demonstration. "
+        f"Area figures are approximate."
+    )
+
+
+def _vessel_crossref(scene) -> None:
+    """
+    What the AIS models say about this same vessel.
+
+    The SAR result on its own cannot attribute anything. Putting the vessel's
+    own anomaly score and distance-to-slick beside the imagery is what turns
+    two detections into one finding — or, for five of these six vessels, into
+    a clearance.
+    """
+    scored = engine.scored_ais()
+    track = scored[scored["mmsi"] == scene.mmsi]
+
+    header = (f"<b>{scene.vessel}</b> "
+              f"<span class='mono' style='color:{theme.MUTED}'>MMSI {scene.mmsi}</span>")
+
+    if track.empty:
+        st.markdown(
+            f"<div class='pos-card tight'><span class='pos-label'>Vessel</span>"
+            f"<div style='margin-top:.2rem'>{header}</div>"
+            f"<div class='pos-sub'>No AIS in the analysis window for this vessel.</div></div>",
+            unsafe_allow_html=True)
+        return
+
+    flagged = int(track["is_anomaly"].sum())
+    peak = float(track["anomaly_score"].max())
+    flag_state = track["flag"].iloc[0]
+    vtype = track["vessel_type"].iloc[0]
+
+    sc = engine.scenario()
+    spill_lat, spill_lon = sc["spill_position"]
+    results = {r["mmsi"]: r for r in engine.attribution(spill_lat, spill_lon, 15.0, 6.0)}
+    att = results.get(scene.mmsi)
+
+    if att and att["band"] == "primary suspect":
+        tone, verdict = theme.CRITICAL, "ATTRIBUTED — PRIMARY SUSPECT"
+    elif att:
+        tone, verdict = theme.GOOD, f"CLEARED — {att['band'].upper()}"
+    else:
+        tone, verdict = theme.MUTED, "NOT RANKED"
+
+    dist = f"{att['min_distance_km']:.1f} km from the observed slick" if att else "—"
+
+    st.markdown(
+        f"""
+<div class="pos-card">
+  <span class="pos-label">Cross-referenced against this vessel's AIS</span>
+  <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin:.3rem 0 .6rem">
+    {header}
+    {theme.pill(verdict, tone)}
+    <span class="mono" style="color:{theme.MUTED}">{flag_state} &middot; {vtype}</span>
+  </div>
+  <div style="display:flex;gap:1.8rem;flex-wrap:wrap;font-size:.82rem">
+    <span><b>{len(track)}</b> <span style="color:{theme.MUTED}">AIS pings</span></span>
+    <span><b style="color:{theme.CRITICAL if flagged else theme.GOOD}">{flagged}</b>
+      <span style="color:{theme.MUTED}">flagged for review</span></span>
+    <span><b>{peak:.2f}</b> <span style="color:{theme.MUTED}">peak reconstruction error</span></span>
+    <span><b>{dist}</b></span>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
     )
 
 
