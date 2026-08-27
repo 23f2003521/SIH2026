@@ -22,7 +22,7 @@ from streamlit.testing.v1 import AppTest  # noqa: E402
 
 APP = str(ROOT / "ui" / "app.py")
 PAGES = ["Overview", "Route Deviation (LSTM)", "AIS Anomaly Detection",
-         "SAR Oil Spill Segmenter", "Attribution Pipeline", "System"]
+         "SAR Oil Spill Segmenter"]
 
 
 def _run(page: str) -> AppTest:
@@ -51,8 +51,3 @@ def test_ais_page_warns_about_the_trawler() -> None:
     body = " ".join(m.value for m in at.markdown)
     assert "trawler" in body.lower()
 
-
-def test_system_page_declares_limitations() -> None:
-    at = _run("System")
-    body = " ".join(m.value for m in at.markdown)
-    assert "No drift or hindcast modelling" in body

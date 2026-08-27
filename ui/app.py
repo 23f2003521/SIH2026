@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 st.set_page_config(
-    page_title="POSEatSea — Oil Spill Detection & Attribution",
+    page_title="Maritime Surveillance — Oil Spill Detection & Attribution",
     page_icon="🛰",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -24,10 +24,8 @@ st.set_page_config(
 from ui import engine, theme  # noqa: E402
 from ui.views import (  # noqa: E402
     ais_view,
-    attribution_view,
     overview,
     sar_view,
-    system_view,
     trajectory_view,
 )
 
@@ -40,8 +38,6 @@ PAGES = {
     "Route Deviation (LSTM)": ("🧭", trajectory_view.render),
     "AIS Anomaly Detection": ("📡", ais_view.render),
     "SAR Oil Spill Segmenter": ("🛰", sar_view.render),
-    "Attribution Pipeline": ("⚖", attribution_view.render),
-    "System": ("⚙", system_view.render),
 }
 
 
@@ -50,7 +46,7 @@ def sidebar() -> str:
         st.markdown(
             f"""
 <div style="padding:.2rem 0 .8rem">
-  <div style="font-size:1.15rem;font-weight:700;letter-spacing:-.02em">POSEatSea</div>
+  <div style="font-size:1.15rem;font-weight:700;letter-spacing:-.02em">Maritime Surveillance</div>
   <div style="font-size:.74rem;color:{theme.MUTED};line-height:1.5;margin-top:.15rem">
     Prediction of Oil Spill Events at Sea<br>
     Satellite &amp; AIS fusion for spill attribution

@@ -41,11 +41,6 @@ def _default_window(track: pd.DataFrame, trace, max_start: int) -> int:
 def render() -> None:
     st.markdown("## Route deviation detection")
     card = traj_mod.model_card()
-    st.markdown(
-        f"<span style='color:{theme.MUTED}'>A 2-layer LSTM maps a vessel's last "
-        f"{SEQ_LEN} AIS pings to its next position. {card['reading']}</span>",
-        unsafe_allow_html=True,
-    )
 
     scored = engine.scored_ais()
     traces = engine.deviation_traces()
@@ -171,13 +166,6 @@ def render() -> None:
                 f"of {len(trace)} windows — excluded",
                 theme.WARN if gaps else theme.GOOD), unsafe_allow_html=True)
 
-        st.caption(
-            "The dashed line is the model's published 90th-percentile error on vessels it "
-            "never saw in training. Sustained excursions above it mean the vessel is moving "
-            "in a way the model did not anticipate — a predictability signal, not a finding "
-            "of wrongdoing."
-        )
-
         if gaps:
             theme.banner(
                 f"<b>{gaps} of {len(trace)} windows sit behind a satellite AIS dropout</b> and "
@@ -185,32 +173,3 @@ def render() -> None:
                 f"when that ping arrives many minutes late the vessel has legitimately travelled "
                 f"kilometres, so the apparent error measures reception, not behaviour.",
                 "warn")
-
-    with st.expander("Operating envelope — where this model can and cannot be trusted"):
-        st.markdown(
-            f"""
-Normalisation is anchored to the AOI and speed distribution the model was trained on,
-which bounds where it can be used at all:
-
-- **Geographic.** Latitude {card['aoi']['lat'][0]:.4f} to {card['aoi']['lat'][1]:.4f},
-  longitude {card['aoi']['lon'][0]:.4f} to {card['aoi']['lon'][1]:.4f} — the Mauritius AOI.
-  Outside this box the normalisation saturates and output is meaningless. The console
-  refuses to predict rather than returning a confident wrong answer.
-- **Cadence.** Probing the checkpoint shows step size is reproduced well at roughly
-  60-second ping intervals. At 5-minute spacing the predicted step falls to under half
-  the true distance travelled.
-- **Heading.** Bearing error is small along the NE–SW lane (courses near 045° and 225°),
-  which dominates traffic in this region. On NW–SE headings the model frequently predicts
-  a bearing close to the reverse of the true one — those courses are sparse in the
-  training area. Windows on that axis are marked *degraded*.
-
-These limits were measured against the supplied weights, not taken on trust. A model
-that is quietly wrong is far more dangerous than one that declares its own boundaries.
-"""
-        )
-
-    theme.provenance(
-        "This model is a standalone capability. It is deliberately not wired into the "
-        "anomaly detector — adding predicted-versus-actual distance as a twelfth input "
-        "feature was tested during development and did not improve detection accuracy."
-    )
