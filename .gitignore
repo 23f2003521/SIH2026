@@ -20,9 +20,11 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Excluded Legacy & Experimental Files (as requested)
-app.py
-app1.py
-app*.py
+# Root-anchored with a leading slash. Without it, a bare `app*.py` pattern
+# matches at ANY depth and silently excludes ui/app.py -- the app entrypoint.
+/app.py
+/app1.py
+/app*.py
 old_PCA_new*.ipynb
 old_PCA*.ipynb
 ais-anomaly-detection.ipynb
