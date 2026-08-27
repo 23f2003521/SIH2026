@@ -5,11 +5,37 @@ import pandas as pd
 import streamlit as st
 
 from poseatsea.config import SEQ_LEN, TRAJ_P90_ERROR_KM
+from poseatsea.scenario.real_ais import WAKASHIO_MMSI
 from poseatsea.inference import trajectory as traj_mod
 
 from streamlit_folium import st_folium
 
 from .. import charts, engine, maps, theme
+
+
+def _default_window(track: pd.DataFrame, trace, max_start: int) -> int:
+    """
+    Open on the most informative window for this vessel.
+
+    For a vessel that lost way and never regained it, that is the approach into
+    the stop: the eight pings ending on the last ping with way on, so the model
+    predicts from a moving ship and the truth ping is the moment she stopped.
+    Anchoring on peak anomaly instead lands mid-wreck, on eight identical
+    zero-knot pings, where a next-position prediction says nothing at all.
+    """
+    moving = track.index[track["speed"] > 1.0]
+    if len(moving):
+        last = int(moving[-1])
+        after = track["speed"].iloc[last + 1:]
+        if len(after) and after.max() <= 1.5:
+            return int(max(0, min(max_start, last - SEQ_LEN + 1)))
+
+    if trace is not None and len(trace):
+        clean = traj_mod.clean_trace(trace)
+        if len(clean):
+            worst = int(clean.loc[clean["deviation_km"].idxmax(), "index"])
+            return int(max(0, min(max_start, worst - SEQ_LEN)))
+    return 0
 
 
 def render() -> None:
@@ -24,22 +50,23 @@ def render() -> None:
     scored = engine.scored_ais()
     traces = engine.deviation_traces()
 
-    names = (scored.groupby("mmsi")["vessel_name"].first().to_dict())
+    names = scored.groupby("mmsi")["vessel_name"].first().to_dict()
     options = {v: k for k, v in names.items()}
-    default = "MV WAKASHIO" if "MV WAKASHIO" in options else list(options)[0]
-    chosen = st.selectbox("Vessel", list(options), index=list(options).index(default))
+    # Key the default off the MMSI, never a display string -- the vessel's name
+    # comes from the feed and must not be hardcoded anywhere.
+    casualty = names.get(WAKASHIO_MMSI)
+    default_ix = list(options).index(casualty) if casualty in options else 0
+    chosen = st.selectbox("Vessel", list(options), index=default_ix)
     mmsi = options[chosen]
 
-    track = scored[scored["mmsi"] == mmsi].reset_index(drop=True)
+    track = scored[scored["mmsi"] == mmsi].sort_values("timestamp").reset_index(drop=True)
     trace = traces.get(mmsi)
 
     # ------------------------------------------------------------------ window
     max_start = max(0, len(track) - SEQ_LEN - 1)
     start = st.slider(
         f"History window (the {SEQ_LEN} pings fed to the model)",
-        0, max_start,
-        min(max_start, int(track["anomaly_score"].idxmax()) - SEQ_LEN
-            if track["anomaly_score"].idxmax() > SEQ_LEN else 0),
+        0, max_start, _default_window(track, trace, max_start),
     )
     history = track.iloc[start:start + SEQ_LEN].reset_index(drop=True)
     truth_row = track.iloc[start + SEQ_LEN]
@@ -125,20 +152,24 @@ def render() -> None:
             st.altair_chart(charts.deviation_timeline(trace, TRAJ_P90_ERROR_KM),
                             use_container_width=True)
 
+        clean = traj_mod.clean_trace(trace)
+        gaps = int(trace["coverage_gap"].sum()) if "coverage_gap" in trace else 0
+        stat = clean if len(clean) else trace
+
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(theme.metric_card(
-                "Median deviation", f"{trace['deviation_km'].median():.3f} km",
+                "Median deviation", f"{stat['deviation_km'].median():.3f} km",
                 f"model's own median {card['median_error_km']} km"), unsafe_allow_html=True)
         with c2:
             st.markdown(theme.metric_card(
-                "90th percentile", f"{trace['deviation_km'].quantile(0.9):.3f} km",
+                "90th percentile", f"{stat['deviation_km'].quantile(0.9):.3f} km",
                 f"model's own p90 {card['p90_error_km']} km"), unsafe_allow_html=True)
         with c3:
             st.markdown(theme.metric_card(
-                "Worst deviation", f"{trace['deviation_km'].max():.3f} km",
-                f"at ping {int(trace.loc[trace['deviation_km'].idxmax(), 'index'])}",
-                theme.WARN), unsafe_allow_html=True)
+                "Coverage gaps", str(gaps),
+                f"of {len(trace)} windows — excluded",
+                theme.WARN if gaps else theme.GOOD), unsafe_allow_html=True)
 
         st.caption(
             "The dashed line is the model's published 90th-percentile error on vessels it "
@@ -146,6 +177,14 @@ def render() -> None:
             "in a way the model did not anticipate — a predictability signal, not a finding "
             "of wrongdoing."
         )
+
+        if gaps:
+            theme.banner(
+                f"<b>{gaps} of {len(trace)} windows sit behind a satellite AIS dropout</b> and "
+                f"are excluded from the figures above. The model predicts <i>the next ping</i>; "
+                f"when that ping arrives many minutes late the vessel has legitimately travelled "
+                f"kilometres, so the apparent error measures reception, not behaviour.",
+                "warn")
 
     with st.expander("Operating envelope — where this model can and cannot be trusted"):
         st.markdown(

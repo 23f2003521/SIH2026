@@ -148,17 +148,42 @@ def anomaly_timeline(track: pd.DataFrame, threshold: float, height: int = 230):
 
 
 def deviation_timeline(trace: pd.DataFrame, p90: float, height: int = 230):
-    """Predicted-vs-actual deviation over a transit."""
-    base = alt.Chart(trace)
-    line = base.mark_line(strokeWidth=1.8, color=theme.ACCENT).encode(
+    """
+    Predicted-vs-actual deviation over a transit.
+
+    Windows sitting behind a satellite AIS dropout are drawn as hollow amber
+    points rather than dropped. They are not model error — the vessel simply
+    kept steaming while nobody was listening — but hiding them would leave
+    unexplained holes in the line.
+    """
+    df = trace.copy()
+    if "coverage_gap" not in df.columns:
+        df["coverage_gap"] = False
+    real, gap = df[~df["coverage_gap"]], df[df["coverage_gap"]]
+
+    tips = ["index:Q", alt.Tooltip("deviation_km:Q", format=".3f"), "confidence:N"]
+    if "gap_s" in df.columns:
+        tips.append(alt.Tooltip("gap_s:Q", title="seconds to next ping", format=".0f"))
+
+    line = alt.Chart(df).mark_line(strokeWidth=1.6, color=theme.ACCENT, opacity=0.7).encode(
         x=alt.X("index:Q", title="Ping number"),
         y=alt.Y("deviation_km:Q", title="Deviation from prediction (km)"),
-        tooltip=["index:Q", alt.Tooltip("deviation_km:Q", format=".3f"), "confidence:N"],
+    )
+    pts = alt.Chart(real).mark_point(size=26, filled=True, color=theme.ACCENT).encode(
+        x="index:Q", y="deviation_km:Q", tooltip=tips,
     )
     band = alt.Chart(pd.DataFrame({"y": [p90]})).mark_rule(
         color=theme.WARN, strokeDash=[6, 4], strokeWidth=1.3,
     ).encode(y="y:Q")
-    return theme.altair_theme(alt.layer(line, band).properties(height=height))
+
+    layers = [line, pts, band]
+    if len(gap):
+        layers.append(
+            alt.Chart(gap).mark_point(
+                size=52, filled=False, color=theme.WARN, strokeWidth=1.5,
+            ).encode(x="index:Q", y="deviation_km:Q", tooltip=tips)
+        )
+    return theme.altair_theme(alt.layer(*layers).properties(height=height))
 
 
 def prediction_detail(history: pd.DataFrame, pred_lat: float, pred_lon: float,

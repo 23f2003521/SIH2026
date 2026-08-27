@@ -432,3 +432,55 @@ def test_no_invented_vessels_remain(scenario):
         text = path.read_text(encoding="utf-8")
         for name in banned_names:
             assert name not in text, f"{path.name} still references {name}"
+
+
+def test_coverage_gaps_are_flagged_not_counted(scenario):
+    """
+    Satellite AIS drops out routinely. The model predicts *the next ping*, so a
+    ping arriving 26 minutes late makes a perfectly ordinary transit look like a
+    9 km blunder. Those windows must be marked, and excluded from accuracy.
+    """
+    model = get_registry()["trajectory"].get()
+    ais = scenario["ais"]
+    track = ais[ais["mmsi"] == WAKASHIO_MMSI].sort_values("timestamp").reset_index(drop=True)
+
+    trace = traj_mod.rolling_predictions(model, track)
+    assert "coverage_gap" in trace.columns
+    assert trace["coverage_gap"].any(), "this feed definitely contains dropouts"
+
+    clean = traj_mod.clean_trace(trace)
+    assert len(clean) < len(trace)
+    assert clean["deviation_km"].max() < trace["deviation_km"].max()
+
+    # Every flagged window must genuinely have a late truth ping.
+    flagged = trace[trace["coverage_gap"]]
+    assert (flagged["gap_s"] > flagged["cadence_s"]).all()
+
+
+def test_route_deviation_opens_on_the_approach():
+    """
+    The page must open on the run-in to the grounding, not on eight identical
+    zero-knot pings from the middle of the wreck, where a next-position
+    prediction carries no information.
+    """
+    from ui.views.trajectory_view import _default_window
+
+    model = get_registry()["trajectory"].get()
+    scored = engine_scored()
+    track = scored[scored["mmsi"] == WAKASHIO_MMSI].sort_values(
+        "timestamp").reset_index(drop=True)
+    trace = traj_mod.rolling_predictions(model, track)
+
+    start = _default_window(track, trace, max(0, len(track) - SEQ_LEN - 1))
+    window = track.iloc[start:start + SEQ_LEN]
+
+    assert window["speed"].iloc[0] > 5.0, "window should open with the vessel under way"
+    assert window["speed"].iloc[-1] < 5.0, "window should end on the deceleration"
+    assert traj_mod.assess_inputs(window).confidence == "nominal"
+
+
+def engine_scored():
+    """Score the scenario the way the console does."""
+    from poseatsea.inference import ais as _ais
+    model, scaler = get_registry()["ais_anomaly"].get()
+    return _ais.score_frame(model, scaler, build_scenario()["ais"])

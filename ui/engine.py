@@ -82,7 +82,19 @@ def deviation_traces(day: str = INCIDENT_DAY) -> Dict[int, pd.DataFrame]:
 
 @st.cache_data(show_spinner=False)
 def max_deviations(day: str = INCIDENT_DAY) -> Dict[int, float]:
-    return {m: float(t["deviation_km"].max()) for m, t in deviation_traces(day).items()}
+    """
+    Worst genuine deviation per vessel.
+
+    Coverage gaps are excluded. A satellite dropout inflates apparent deviation
+    to kilometres, and feeding that into attribution would penalise a vessel for
+    the receiver's shortcomings rather than its own behaviour.
+    """
+    out: Dict[int, float] = {}
+    for mmsi, trace in deviation_traces(day).items():
+        clean = traj_mod.clean_trace(trace)
+        use = clean if len(clean) else trace
+        out[mmsi] = float(use["deviation_km"].max())
+    return out
 
 
 @st.cache_data(show_spinner="Correlating spill against AIS traffic...")

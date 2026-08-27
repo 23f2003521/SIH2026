@@ -311,6 +311,13 @@ def predict_next_position(model, history: pd.DataFrame,
     )
 
 
+# A truth ping this much later than the window's own cadence is a reception
+# gap, not a manoeuvre. The model predicts "the next ping", so if the next ping
+# arrives 26 minutes late the vessel has legitimately travelled kilometres and
+# the resulting "deviation" measures coverage, not behaviour.
+COVERAGE_GAP_FACTOR = 4.0
+
+
 def rolling_predictions(model, track: pd.DataFrame, stride: int = 1) -> pd.DataFrame:
     """
     Walk an 8-ping window along a full track, predicting each next position and
@@ -318,8 +325,15 @@ def rolling_predictions(model, track: pd.DataFrame, stride: int = 1) -> pd.DataF
 
     This turns a single-shot predictor into a continuous deviation trace, which
     is what makes the "expected vs. actual" story legible over a whole transit.
+
+    Windows whose truth ping arrives far later than the window's own cadence are
+    marked `coverage_gap`. Satellite AIS drops out routinely, and a vessel that
+    keeps steaming through a 26-minute hole will look wildly "unpredictable"
+    when in fact nothing unusual happened. Callers should exclude these before
+    quoting accuracy, and the UI draws them differently.
     """
     rows = []
+    has_time = "timestamp" in track.columns
     for start in range(0, len(track) - SEQ_LEN, stride):
         window = track.iloc[start:start + SEQ_LEN]
         truth = track.iloc[start + SEQ_LEN]
@@ -332,6 +346,16 @@ def rolling_predictions(model, track: pd.DataFrame, stride: int = 1) -> pd.DataF
                          "longitude": float(truth["longitude"])},
             strict=False,
         )
+
+        gap_s = cadence_s = float("nan")
+        coverage_gap = False
+        if has_time:
+            ts = pd.to_datetime(window["timestamp"])
+            cadence_s = float(ts.diff().dt.total_seconds().median())
+            gap_s = float((pd.to_datetime(truth["timestamp"]) - ts.iloc[-1]).total_seconds())
+            if np.isfinite(cadence_s) and cadence_s > 0:
+                coverage_gap = gap_s > COVERAGE_GAP_FACTOR * max(cadence_s, 5.0)
+
         rows.append({
             "index": int(start + SEQ_LEN),
             "timestamp": truth.get("timestamp"),
@@ -341,8 +365,18 @@ def rolling_predictions(model, track: pd.DataFrame, stride: int = 1) -> pd.DataF
             "pred_lon": pred.predicted_lon,
             "deviation_km": pred.deviation_km,
             "confidence": assessment.confidence,
+            "gap_s": gap_s,
+            "cadence_s": cadence_s,
+            "coverage_gap": coverage_gap,
         })
     return pd.DataFrame(rows)
+
+
+def clean_trace(trace: pd.DataFrame) -> pd.DataFrame:
+    """The subset of a trace that actually measures the model, not the feed."""
+    if trace.empty or "coverage_gap" not in trace.columns:
+        return trace
+    return trace[~trace["coverage_gap"]]
 
 
 def model_card() -> Dict[str, Any]:
