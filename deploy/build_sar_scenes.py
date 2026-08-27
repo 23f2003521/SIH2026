@@ -147,6 +147,13 @@ def main() -> int:
         print(f"  {scene['key']:22s} oil {entry['oil_area_km2']:6.2f} km2  "
               f"slicks {entry['slicks']:2d}  -> {scene['vessel']}")
 
+    # Drop files left behind by a renamed or removed scene, so the folder can
+    # never disagree with the manifest.
+    keep = {f"{e['key']}.jpg" for e in manifest} | {f"{e['key']}_mask.png" for e in manifest}
+    for stale in sorted(set(p.name for p in OUT.iterdir()) - keep):
+        (OUT / stale).unlink()
+        print(f"  pruned stale {stale}")
+
     MANIFEST.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(f"\nwrote {MANIFEST.relative_to(ROOT)} ({len(manifest)} scenes)")
     return 0
