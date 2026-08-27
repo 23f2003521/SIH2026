@@ -12,15 +12,8 @@ from streamlit_folium import st_folium
 
 from .. import charts, engine, maps, theme
 
-
 def render() -> None:
     st.markdown("## AIS anomaly inspector")
-    card = ais_mod.model_card()
-    st.markdown(
-        f"<span style='color:{theme.MUTED}'>An 11-feature autoencoder scores each AIS ping "
-        f"by how badly it reconstructs. {card['reading']}</span>",
-        unsafe_allow_html=True,
-    )
 
     scored = engine.scored_ais()
     rollup = ais_mod.vessel_rollup(scored)
@@ -41,15 +34,6 @@ def render() -> None:
             show.style.format({"Peak error": "{:.3f}", "Mean error": "{:.4f}",
                                "Flagged %": "{:.1f}"}),
             use_container_width=True, hide_index=True,
-        )
-
-        theme.banner(
-            "<b>Read this table carefully.</b> The highest raw anomaly score in this "
-            "window belongs to a <i>trawler working inshore</i>, not to the casualty. "
-            "Tight repeated turns are kinematically anomalous and entirely lawful. "
-            "A behavioural flag is a reason to look, never a finding on its own &mdash; "
-            "which is exactly why attribution also requires proximity to the slick.",
-            "warn",
         )
 
         st_folium(maps.traffic_map(scored), use_container_width=True,
@@ -88,8 +72,6 @@ def render() -> None:
         st.markdown("##### Reconstruction error over time")
         st.altair_chart(charts.anomaly_timeline(track, AE_THRESHOLD),
                         use_container_width=True)
-        st.caption("Log-scaled. The dashed line is the training-time decision threshold; "
-                   "points above it are flagged.")
 
         # Ping-level inspection
         st.markdown("##### Inspect a single ping")
@@ -132,8 +114,6 @@ def render() -> None:
             )
             st.dataframe(contrib.style.format({"Squared error": "{:.4f}"}),
                          use_container_width=True, hide_index=True)
-            st.caption("Per-feature reconstruction error, largest first — the model's "
-                       "own account of what looked wrong.")
 
         with st.expander("Full ping history"):
             cols = ["timestamp", "latitude", "longitude", "speed", "course", "rot",
@@ -152,8 +132,6 @@ def render() -> None:
     # ------------------------------------------------------------------ manual
     with tab_manual:
         st.markdown("##### Score an arbitrary ping")
-        st.caption("The model consumes exactly these eleven features, in this order. "
-                   "The five `_diff` features are the change since the vessel's previous ping.")
 
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -198,9 +176,3 @@ def render() -> None:
         if top:
             st.markdown("**Largest error contributors:** " +
                         ", ".join(f"`{f}` ({e:.3f})" for f, e in top))
-
-    theme.provenance(
-        f"Precision {card['precision']:.0%} · recall {card['recall']:.0%} on held-out data. "
-        f"The wording throughout is \"flagged for review\", never \"confirmed violation\", "
-        f"because a screening model with 41% recall cannot clear a vessel — only nominate one."
-    )

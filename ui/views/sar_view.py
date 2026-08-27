@@ -7,7 +7,7 @@ import numpy as np
 import streamlit as st
 from PIL import Image
 
-from poseatsea.config import CLASS_NAMES, SAR_INPUT_SIZE
+from poseatsea.config import CLASS_NAMES
 from poseatsea.inference import sar as sar_mod
 from poseatsea.scenario import sar_scenes
 
@@ -22,12 +22,6 @@ def _to_png_bytes(arr: np.ndarray) -> bytes:
 
 def render() -> None:
     st.markdown("## SAR oil spill segmenter")
-    st.markdown(
-        f"<span style='color:{theme.MUTED}'>U-Net with a MiT-B2 SegFormer encoder, "
-        f"trained on the Krestenitis Sentinel-1 benchmark. Every pixel is assigned "
-        f"to one of five classes at {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE}.</span>",
-        unsafe_allow_html=True,
-    )
 
     has_library = sar_scenes.available()
     modes = (["Scene library", "Upload a scene"] if has_library else ["Upload a scene"])
@@ -53,8 +47,6 @@ def _library_view() -> None:
     with c2:
         alpha = st.slider("Overlay opacity", 0.0, 1.0, 0.45, 0.05)
 
-    st.caption(scene.blurb)
-
     image = scene.load_image()
     mask = scene.load_mask()
 
@@ -76,16 +68,6 @@ def _library_view() -> None:
 
     _imagery(image, mask, alpha, scene.class_pixels, scene.pixel_resolution_m)
     _legend()
-
-    theme.provenance(
-        f"Real Sentinel-1 scene at {scene.source_size[0]}×{scene.source_size[1]} from the "
-        f"Krestenitis benchmark. The network emits {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE}; that "
-        f"output is resampled back to the source resolution with nearest-neighbour before "
-        f"any area is measured, so a pixel really is {scene.pixel_resolution_m:.0f} m on the "
-        f"ground. Precomputed so the page renders without loading the 110 MB segmenter. "
-        f"Pairing a scene with a vessel's operating area is presentational — the segmentation "
-        f"is genuine model output."
-    )
 
 
 def _vessel_crossref(scene) -> None:
@@ -204,13 +186,6 @@ def _upload_view() -> None:
 
     _imagery(image, result.mask, alpha, named, resolution, result.slicks)
     _legend()
-
-    theme.provenance(
-        f"Live inference. The network consumes and emits {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE}; "
-        f"the mask is resampled back to your scene's resolution before area is measured. "
-        f"Figures remain approximate — ground resolution is your assumption, and the "
-        f"resample carries its own error."
-    )
 
 
 # --------------------------------------------------------------------------

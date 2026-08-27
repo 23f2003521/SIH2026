@@ -34,10 +34,10 @@ theme.inject()
 # Names deliberately match the pipeline vocabulary the team already uses, so
 # the navigation reads the same way the problem statement does.
 PAGES = {
-    "Overview": ("🎯", overview.render),
-    "Route Deviation (LSTM)": ("🧭", trajectory_view.render),
-    "AIS Anomaly Detection": ("📡", ais_view.render),
-    "SAR Oil Spill Segmenter": ("🛰", sar_view.render),
+    "Overview": overview.render,
+    "Route Deviation (LSTM)": trajectory_view.render,
+    "AIS Anomaly Detection": ais_view.render,
+    "SAR Oil Spill Segmenter": sar_view.render,
 }
 
 
@@ -57,7 +57,6 @@ def sidebar() -> str:
         )
 
         choice = st.radio("Navigation", list(PAGES),
-                          format_func=lambda k: f"{PAGES[k][0]}  {k}",
                           label_visibility="collapsed")
 
         st.divider()
@@ -77,14 +76,6 @@ def sidebar() -> str:
                 unsafe_allow_html=True,
             )
 
-        st.divider()
-        st.markdown(
-            f"<div style='font-size:.7rem;color:{theme.MUTED};line-height:1.6'>"
-            f"Real AIS &mdash; Mauritius AOI, July 2020. The <b>MV Wakashio</b> "
-            f"grounding of 25 July 2020 is recorded in this feed by the "
-            f"vessel itself.</div>",
-            unsafe_allow_html=True,
-        )
     return choice
 
 
@@ -131,7 +122,7 @@ def _fleet_monitor() -> None:
 
 def main() -> None:
     choice = sidebar()
-    PAGES[choice][1]()
+    PAGES[choice]()
 
 
 if __name__ == "__main__":

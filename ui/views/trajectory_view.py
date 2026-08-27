@@ -101,14 +101,6 @@ def render() -> None:
             "Input confidence", assessment.confidence.title(),
             "against the training envelope", conf_color), unsafe_allow_html=True)
 
-    verdict = pred.deviation_verdict()
-    if verdict:
-        good = dev is not None and dev <= TRAJ_P90_ERROR_KM
-        theme.banner(f"<b>{verdict}</b>", "good" if good else "warn")
-
-    for w in assessment.warnings:
-        theme.banner(w, "warn")
-
     # ------------------------------------------------------------------ plots
     left, right = st.columns([1.6, 1])
     with left:
@@ -125,7 +117,6 @@ def render() -> None:
             {"color": theme.WARN, "label": "Deviation"},
             {"color": theme.CRITICAL, "label": "Reef hazard"},
         ]), unsafe_allow_html=True)
-        st.caption("Zoom in on the red ring to see predicted versus actual separate.")
     with right:
         st.markdown("##### The window the model saw")
         cols = ["timestamp", "latitude", "longitude", "speed", "course", "rot"]
@@ -141,8 +132,6 @@ def render() -> None:
                 use_container_width=True, height=400, returned_objects=[],
                 key=f"dev_map_{mmsi}",
             )
-            st.caption("Each ping sized and coloured by how far it fell from the "
-                       "model's prediction — green predictable, red not.")
         with tcol:
             st.altair_chart(charts.deviation_timeline(trace, TRAJ_P90_ERROR_KM),
                             use_container_width=True)
@@ -165,11 +154,3 @@ def render() -> None:
                 "Coverage gaps", str(gaps),
                 f"of {len(trace)} windows — excluded",
                 theme.WARN if gaps else theme.GOOD), unsafe_allow_html=True)
-
-        if gaps:
-            theme.banner(
-                f"<b>{gaps} of {len(trace)} windows sit behind a satellite AIS dropout</b> and "
-                f"are excluded from the figures above. The model predicts <i>the next ping</i>; "
-                f"when that ping arrives many minutes late the vessel has legitimately travelled "
-                f"kilometres, so the apparent error measures reception, not behaviour.",
-                "warn")
