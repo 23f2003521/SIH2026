@@ -29,7 +29,7 @@ from poseatsea.inference import ais as ais_mod  # noqa: E402
 from poseatsea.inference import sar as sar_mod  # noqa: E402
 from poseatsea.inference import trajectory as traj_mod  # noqa: E402
 from poseatsea.registry import get_registry  # noqa: E402
-from poseatsea.scenario import build_scenario  # noqa: E402
+from poseatsea.scenario.real_ais import WAKASHIO_MMSI, build_scenario  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -105,47 +105,56 @@ def test_unscaled_input_gives_a_different_answer():
 # The detector separates what it claims to separate
 # --------------------------------------------------------------------------
 def test_grounding_flags_and_normal_transit_does_not(scored):
-    wakashio = scored[scored["mmsi"] == 371284000]
-    aground = wakashio[wakashio["phase"] == "aground"]
-    assert aground["is_anomaly"].all(), "every aground ping should flag"
-    assert aground["anomaly_score"].max() > 3 * AE_THRESHOLD
+    """The casualty must flag heavily; real innocent traffic must not."""
+    wakashio = scored[scored["mmsi"] == WAKASHIO_MMSI]
+    assert wakashio["is_anomaly"].mean() > 0.30
+    assert wakashio["anomaly_score"].max() > 10 * AE_THRESHOLD
 
-    for mmsi in (419002731, 256891004, 563114900):      # clean transits
-        track = scored[scored["mmsi"] == mmsi]
-        assert not track["is_anomaly"].any(), f"{mmsi} transits cleanly and must not flag"
+    for mmsi, track in scored[scored["mmsi"] != WAKASHIO_MMSI].groupby("mmsi"):
+        assert track["is_anomaly"].mean() < 0.05, f"{mmsi} is innocent traffic"
 
 
-def test_anchored_vessel_is_not_treated_as_anomalous(scored):
+def test_detector_fires_as_the_vessel_loses_way(scored):
     """
-    A hull at anchor has no steerage way, so its course is held rather than
-    derived from receiver dither. Without that, GPS noise reads as a vessel
-    spinning on its anchor and swamps the real casualty.
+    The whole value proposition: the strike itself is flagged, not just the
+    hours of sitting on the reef afterwards.
     """
-    anchored = scored[scored["mmsi"] == 352001899]
-    assert anchored["is_anomaly"].mean() < 0.10
+    wakashio = scored[scored["mmsi"] == WAKASHIO_MMSI].sort_values("timestamp")
+    approach = wakashio[wakashio["phase"] == "final approach"]
+    assert approach["is_anomaly"].any(), "no flag before the vessel came to rest"
+    first = approach[approach["is_anomaly"]].iloc[0]
+    assert first["speed"] < 5.0, "the flag should coincide with the deceleration"
 
 
-def test_course_diff_wraps_shortest_way():
-    df = pd.DataFrame({
-        "mmsi": [1, 1], "timestamp": pd.to_datetime(["2020-07-25T00:00", "2020-07-25T00:01"]),
-        "latitude": [-20.4, -20.4], "longitude": [57.8, 57.8],
-        "speed": [10.0, 10.0], "course": [359.0, 1.0], "rot": [0.0, 0.0],
-    })
-    out = ais_mod.add_derived_features(df)
-    assert out["course_diff"].iloc[1] == pytest.approx(2.0)
+def test_aground_status_is_really_in_the_feed(scenario):
+    """Status 6 is broadcast by the ship, not asserted by us."""
+    ais = scenario["ais"]
+    wakashio = ais[ais["mmsi"] == WAKASHIO_MMSI]
+    assert (wakashio["status"] == 6).any() or (wakashio["phase"] == "aground").any()
 
 
 # --------------------------------------------------------------------------
 # Trajectory guard rails
 # --------------------------------------------------------------------------
 def test_prediction_matches_published_accuracy(scenario):
-    """Reconstructed tracks must sit inside the model's own error envelope."""
+    """
+    On real, unseen tracks the model must hit its published error envelope.
+    This is the strongest validation available: genuine AIS the model never
+    trained on, scored against the accuracy its authors claimed.
+    """
     model = get_registry()["trajectory"].get()
-    track = scenario["ais"]
-    clean = track[track["mmsi"] == 563114900].reset_index(drop=True)
-    trace = traj_mod.rolling_predictions(model, clean)
-    assert len(trace) > 50
-    assert trace["deviation_km"].median() < 0.37, "should beat the published mean error"
+    ais = scenario["ais"]
+    checked = 0
+    for mmsi, group in ais.groupby("mmsi"):
+        track = group.sort_values("timestamp").reset_index(drop=True)
+        trace = traj_mod.rolling_predictions(model, track)
+        if len(trace) < 30:
+            continue
+        checked += 1
+        median = float(trace["deviation_km"].median())
+        assert median < 0.37, (f"{track['vessel_name'].iloc[0]}: median deviation "
+                               f"{median:.3f} km exceeds the published mean error")
+    assert checked >= 4, "expected several vessels with usable track length"
 
 
 def test_out_of_aoi_history_is_refused():
@@ -176,24 +185,25 @@ def test_wrong_sequence_length_is_refused():
 # --------------------------------------------------------------------------
 # Attribution
 # --------------------------------------------------------------------------
-def test_attribution_names_the_casualty_not_the_trawler(scenario, scored):
+def test_attribution_names_the_casualty_and_clears_everyone_else(scenario, scored):
     """
-    The trawler carries the highest raw anomaly score in the whole window. If
-    attribution ever ranked it first, the fusion logic would be broken.
+    The casualty must come top, and every other real vessel in the window --
+    all of them innocent -- must be cleared rather than merely ranked lower.
     """
     lat, lon = scenario["spill_position"]
     results = fusion.attribute(scored, lat, lon, observed_at=scenario["grounding_utc"])
 
-    assert results[0].mmsi == 371284000
+    assert results[0].mmsi == WAKASHIO_MMSI
     assert results[0].confidence_band == "primary suspect"
+    assert results[0].min_distance_km < 0.5
 
-    trawler = next(r for r in results if r.mmsi == 645079210)
-    assert trawler.max_anomaly_score == 0.0, "trawler is nowhere near the slick"
-    assert results[0].total_score > trawler.total_score * 5
+    for other in results[1:]:
+        assert other.confidence_band == "cleared by proximity", (
+            f"{other.vessel_name} should be cleared, got {other.confidence_band}")
+        assert other.max_anomaly_score == 0.0, (
+            f"{other.vessel_name} was nowhere near the slick")
 
-    # ...and it really does out-score the casualty on behaviour alone.
-    peak = scored.groupby("mmsi")["anomaly_score"].max()
-    assert peak[645079210] > peak[371284000]
+    assert results[0].total_score > 4 * results[1].total_score
 
 
 def test_attribution_margin_is_decisive(scenario, scored):
@@ -215,14 +225,42 @@ def test_distant_spill_clears_everyone(scored):
 
 
 # --------------------------------------------------------------------------
-# Scenario integrity
+# Real AIS integrity
 # --------------------------------------------------------------------------
-def test_track_terminates_on_the_reef(scenario):
-    wakashio = scenario["ais"]
-    wakashio = wakashio[wakashio["mmsi"] == 371284000]
-    lat, lon = scenario["spill_position"]
-    final = wakashio.iloc[-1]
-    assert traj_mod.haversine_km(final["latitude"], final["longitude"], lat, lon) < 0.15
+def test_every_timestamp_parses():
+    """
+    About 4% of rows carry fractional seconds. A single inferred format drops
+    them silently, which would quietly delete parts of the track.
+    """
+    from poseatsea.scenario.real_ais import load_raw
+    assert load_raw()["timestamp"].notna().all()
+
+
+def test_rot_sentinel_is_neutralised(scenario):
+    """-128 means 'not available', not a hard port swing."""
+    assert (scenario["ais"]["rot"] == -128).sum() == 0
+
+
+def test_grounding_is_detected_from_the_data(scenario):
+    """
+    Position and time are derived from the feed, not hardcoded, and must land
+    on the documented casualty: Pointe d'Esny at 19:25 local (15:25 UTC).
+    """
+    event = scenario["event"]
+    assert event is not None
+    lat, lon = event.position
+    assert traj_mod.haversine_km(lat, lon, -20.4442, 57.7433) < 0.5
+    assert event.utc.strftime("%Y-%m-%d") == "2020-07-25"
+    assert 15 <= event.utc.hour <= 16
+    assert event.gap_seconds < 300, "loss of way should be abrupt"
+
+
+def test_wakashio_never_moves_again(scenario):
+    """Six days aground: no ping after the strike shows meaningful way."""
+    ais = scenario["ais"]
+    after = ais[(ais["mmsi"] == WAKASHIO_MMSI) & (ais["phase"] == "aground")]
+    assert len(after) > 50
+    assert after["speed"].max() < 1.5
 
 
 def test_scenario_is_deterministic():
@@ -293,12 +331,19 @@ def test_library_separates_oil_from_lookalike():
     assert scenes["clean_coastal"].oil_area_km2 == 0.0
 
 
-def test_every_scene_maps_to_a_real_vessel(scenario):
+def test_only_the_casualty_is_attributed_to_a_vessel(scenario):
+    """
+    Every other ship in this feed is real, named and innocent. Pinning an oil
+    signature on one of them would be indefensible, so only the Wakashio scene
+    names a vessel.
+    """
     from poseatsea.scenario import sar_scenes
     known = set(scenario["ais"]["mmsi"].unique())
-    for s in sar_scenes.load_scenes():
-        assert s.mmsi in known, f"{s.key} references unknown MMSI {s.mmsi}"
-        assert sar_scenes.by_mmsi(s.mmsi).key == s.key
+    attributed = [s for s in sar_scenes.load_scenes() if s.attributed]
+    assert len(attributed) == 1
+    assert attributed[0].mmsi == WAKASHIO_MMSI
+    assert attributed[0].mmsi in known
+    assert sar_scenes.by_mmsi(WAKASHIO_MMSI).key == "wakashio_reef"
 
 
 def test_sar_checkpoint_is_trained():

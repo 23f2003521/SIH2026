@@ -126,7 +126,7 @@ send an investigation to the wrong vessel with false confidence.
 
 What the console does instead is state its assumption plainly — the oil lies
 where it was seen — and let the operator judge whether elapsed time makes that
-assumption safe. For the reconstructed Wakashio case it is unusually safe: the
+assumption safe. For the Wakashio case it is unusually safe: the
 source was a stationary hull pinned on a reef, continuously transmitting AIS
 from the position the oil was escaping.
 

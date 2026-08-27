@@ -27,13 +27,11 @@ Three trained models behind one console:
 A transparent correlation layer ties their outputs to one place and time and
 ranks the vessels that could account for an observed slick.
 
-## Demonstration data
+## Data
 
-The console ships with a reconstruction of the **MV Wakashio** grounding
-(Pointe d'Esny, Mauritius, 25 July 2020). Vessel particulars, voyage, grounding
-position and timing follow the public casualty record; the individual AIS pings
-are physically consistent synthesis, not recovered signal. This is labelled
-throughout the interface.
+Real AIS: a Mauritius AOI extract for July 2020, containing the **MV Wakashio**'s
+own broadcasts through her grounding at Pointe d'Esny on 25 July 2020 and the six
+days of navigational status 6 (aground) that followed.
 
 ## Declared limitations
 

@@ -24,11 +24,12 @@ def render() -> None:
     )
 
     theme.banner(
-        "<b>Reconstructed scenario.</b> Vessel particulars, voyage, grounding position and "
-        "timing follow the public casualty record. The individual AIS pings are physically "
-        "consistent synthesis, not recovered signal &mdash; they exist to exercise the "
-        "detection pipeline, and no figure on this page is a measurement of the real casualty.",
-        "warn",
+        "<b>Real AIS.</b> Mauritius AOI extract, July 2020 &mdash; the same region and month "
+        "the trajectory model was normalised for. The grounding below is the vessel's own "
+        "broadcast: it reports 11.6 kn on course 246&deg;, loses way at 15:27:22 UTC, and "
+        "then transmits navigational status 6 (aground) for six days. Nothing on this page "
+        "is synthetic.",
+        "info",
     )
 
     scored = engine.scored_ais()

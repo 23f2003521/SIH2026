@@ -39,7 +39,7 @@ from poseatsea.inference import ais as ais_mod  # noqa: E402
 from poseatsea.inference import sar as sar_mod  # noqa: E402
 from poseatsea.inference import trajectory as traj_mod  # noqa: E402
 from poseatsea.registry import get_registry  # noqa: E402
-from poseatsea.scenario import build_scenario  # noqa: E402
+from poseatsea.scenario.real_ais import build_scenario  # noqa: E402
 
 
 @asynccontextmanager
@@ -100,7 +100,7 @@ class AttributionRequest(BaseModel):
     radius_km: float = 15.0
     window_hours: float = 6.0
     pings: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Raw AIS rows. Omit to use the built-in Wakashio scenario.")
+        None, description="Raw AIS rows. Omit to use the built-in Mauritius AOI feed.")
 
 
 # --------------------------------------------------------------------------
@@ -265,15 +265,17 @@ def rank(request: AttributionRequest) -> Dict[str, Any]:
 
 @app.get("/scenario", tags=["scenario"])
 def scenario(limit: int = Query(200, ge=1, le=5000)) -> Dict[str, Any]:
-    """The reconstructed Wakashio scenario, for clients without their own AIS."""
+    """The real Mauritius AOI AIS feed, for clients without their own."""
     sc = build_scenario()
     incident = dict(sc["incident"])
-    incident["grounding_utc"] = incident["grounding_utc"].isoformat()
+    if incident.get("grounding_utc") is not None:
+        incident["grounding_utc"] = incident["grounding_utc"].isoformat()
+    incident.pop("observed", None)          # carries a raw datetime
     return {
         "incident": incident,
         "provenance": sc["provenance"],
         "spill_position": sc["spill_position"],
-        "vessels": sc["vessels"].to_dict(orient="records"),
+        "vessels": sc["vessels"].astype(str).to_dict(orient="records"),
         "ais_sample": sc["ais"].head(limit).to_dict(orient="records"),
         "total_pings": len(sc["ais"]),
     }

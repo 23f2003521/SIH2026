@@ -87,8 +87,8 @@ def test_trajectory_predicts_inside_aoi(client):
 
 def test_attribution_uses_builtin_scenario(client):
     body = client.post("/attribution/rank",
-                       json={"spill_lat": -20.4372, "spill_lon": 57.7433}).json()
-    assert body["candidates"][0]["vessel_name"] == "MV WAKASHIO"
+                       json={"spill_lat": -20.4442, "spill_lon": 57.7433}).json()
+    assert "WAKASHIO" in body["candidates"][0]["vessel_name"].upper()
     assert "ocean-current" in body["caveat"].lower()
     assert sum(body["weights"].values()) == pytest.approx(1.0)
 
@@ -112,5 +112,6 @@ def test_sar_rejects_a_non_image(client):
 
 def test_scenario_declares_its_provenance(client):
     body = client.get("/scenario?limit=5").json()
-    assert "not recovered signal" in body["provenance"]
+    assert "Real AIS" in body["provenance"]
+    assert "synthetic" in body["provenance"]
     assert body["total_pings"] > 700

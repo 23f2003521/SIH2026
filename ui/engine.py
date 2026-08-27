@@ -26,7 +26,10 @@ from poseatsea.inference import ais as ais_mod  # noqa: E402
 from poseatsea.inference import sar as sar_mod  # noqa: E402
 from poseatsea.inference import trajectory as traj_mod  # noqa: E402
 from poseatsea.registry import get_registry  # noqa: E402
-from poseatsea.scenario import build_scenario  # noqa: E402
+from poseatsea.scenario.real_ais import (  # noqa: E402
+    INCIDENT_DAY,
+    build_scenario,
+)
 
 
 @st.cache_resource(show_spinner=False)
@@ -52,47 +55,48 @@ def trajectory_model():
 # --------------------------------------------------------------------------
 # Scenario + derived analytics, cached on their inputs
 # --------------------------------------------------------------------------
-@st.cache_data(show_spinner=False)
-def scenario(interval_s: float = 60.0, seed: int = 20200725) -> Dict[str, Any]:
-    return build_scenario(interval_s=interval_s, seed=seed)
+@st.cache_data(show_spinner="Loading Mauritius AOI AIS...")
+def scenario(day: str = INCIDENT_DAY) -> Dict[str, Any]:
+    """Real AIS for one day in the AOI. Cached: the CSV parse is not free."""
+    return build_scenario(day)
 
 
 @st.cache_data(show_spinner="Scoring AIS pings...")
-def scored_ais(interval_s: float = 60.0, seed: int = 20200725) -> pd.DataFrame:
+def scored_ais(day: str = INCIDENT_DAY) -> pd.DataFrame:
     model, scaler = ais_model()
-    return ais_mod.score_frame(model, scaler, scenario(interval_s, seed)["ais"])
+    return ais_mod.score_frame(model, scaler, scenario(day)["ais"])
 
 
 @st.cache_data(show_spinner="Running trajectory predictions...")
-def deviation_traces(interval_s: float = 60.0, seed: int = 20200725) -> Dict[int, pd.DataFrame]:
+def deviation_traces(day: str = INCIDENT_DAY) -> Dict[int, pd.DataFrame]:
     """One rolling predicted-vs-actual trace per vessel."""
     model = trajectory_model()
     out: Dict[int, pd.DataFrame] = {}
-    for mmsi, group in scenario(interval_s, seed)["ais"].groupby("mmsi"):
-        trace = traj_mod.rolling_predictions(model, group.reset_index(drop=True))
+    for mmsi, group in scenario(day)["ais"].groupby("mmsi"):
+        track = group.sort_values("timestamp").reset_index(drop=True)
+        trace = traj_mod.rolling_predictions(model, track)
         if len(trace):
             out[int(mmsi)] = trace
     return out
 
 
 @st.cache_data(show_spinner=False)
-def max_deviations(interval_s: float = 60.0, seed: int = 20200725) -> Dict[int, float]:
-    return {m: float(t["deviation_km"].max()) for m, t in deviation_traces(interval_s, seed).items()}
+def max_deviations(day: str = INCIDENT_DAY) -> Dict[int, float]:
+    return {m: float(t["deviation_km"].max()) for m, t in deviation_traces(day).items()}
 
 
 @st.cache_data(show_spinner="Correlating spill against AIS traffic...")
 def attribution(spill_lat: float, spill_lon: float, radius_km: float,
-                window_hours: float, interval_s: float = 60.0,
-                seed: int = 20200725) -> List[Dict[str, Any]]:
-    sc = scenario(interval_s, seed)
+                window_hours: float, day: str = INCIDENT_DAY) -> List[Dict[str, Any]]:
+    sc = scenario(day)
     results = fusion.attribute(
-        scored_ais(interval_s, seed),
+        scored_ais(day),
         spill_lat, spill_lon,
         observed_at=sc["grounding_utc"],
         radius_km=radius_km,
         window_hours=window_hours,
         threshold=AE_THRESHOLD,
-        deviations=max_deviations(interval_s, seed),
+        deviations=max_deviations(day),
     )
     return [r.as_dict() for r in results]
 

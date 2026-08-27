@@ -6,7 +6,7 @@ import streamlit as st
 
 from poseatsea.config import AE_THRESHOLD, FEATURE_ORDER
 from poseatsea.inference import ais as ais_mod
-from poseatsea.scenario.wakashio import to_csv_bytes
+from poseatsea.scenario.real_ais import to_csv_bytes
 
 from streamlit_folium import st_folium
 
@@ -143,9 +143,9 @@ def render() -> None:
                          use_container_width=True, hide_index=True, height=320)
 
         st.download_button(
-            "Download this scenario as AIS CSV",
+            "Download this day's AIS as CSV",
             data=to_csv_bytes(engine.scenario()["ais"]),
-            file_name="wakashio_scenario_ais.csv",
+            file_name="mauritius_aoi_20200725_ais.csv",
             mime="text/csv",
         )
 

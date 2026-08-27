@@ -9,3 +9,9 @@
 # -- it exceeds GitHub's 100 MB blob limit and Streamlit Cloud cannot resolve LFS
 # pointers anyway, so it is fetched from the Hugging Face Hub at runtime.
 # See poseatsea/weights.py and deploy/DEPLOY.md.
+
+# Data files keep their bytes exactly: CRLF conversion would rewrite every
+# line of the AIS extract and change its checksum for no reason.
+assets/ais/*.csv -text
+*.jpg  binary
+*.png  binary

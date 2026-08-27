@@ -43,7 +43,7 @@ def test_overview_names_the_suspect() -> None:
     at = _run("Overview")
     body = " ".join(m.value for m in at.markdown)
     assert "WAKASHIO" in body
-    assert "Reconstructed scenario" in body
+    assert "Real AIS" in body
 
 
 def test_ais_page_warns_about_the_trawler() -> None:

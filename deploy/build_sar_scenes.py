@@ -34,39 +34,43 @@ RAW = ROOT / "assets" / "sar_samples" / "raw"
 OUT = ROOT / "assets" / "sar_samples" / "scenes"
 MANIFEST = ROOT / "assets" / "sar_samples" / "manifest.json"
 
-# Source scene -> curated identity. Vessel assignments follow the AIS scenario
-# so the two halves of the demo agree: the casualty gets the major spill, the
-# runner-up suspect gets a small discharge, and the erratic trawler that the
-# anomaly detector over-flags gets a scene that is pure look-alike.
+# Source scene -> curated identity.
+#
+# Only the Wakashio scene is attributed to a vessel, because only the Wakashio
+# is a documented polluter. The other four are AOI survey passes identified by
+# place and time. Every other ship in this dataset is a real, named, innocent
+# vessel, and pinning an oil signature on one of them because it made a
+# convenient demo would be indefensible.
 SCENES = [
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM.jpeg",
         "key": "wakashio_reef",
         "title": "Pointe d'Esny — main slick",
-        "mmsi": 371284000,
+        "mmsi": 372711000,
         "vessel": "MV WAKASHIO",
         "captured": "2020-08-07 06:14 UTC",
-        "position": [-20.4372, 57.7433],
+        "position": [-20.4442, 57.7433],
         "blurb": ("Sentinel-1 pass over the grounding site. A large, branching "
                   "mineral-oil signature trailing from the wreck."),
     },
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (4).jpeg",
-        "key": "anchorage_discharge",
-        "title": "Anchorage — small discharge",
-        "mmsi": 352001899,
-        "vessel": "MV BLUE BAY TRADER",
+        "key": "open_water_slick",
+        "title": "Open water — small slick",
+        "mmsi": None,
+        "vessel": "AOI survey pass",
         "captured": "2020-07-25 14:02 UTC",
         "position": [-20.2650, 57.8300],
-        "blurb": ("A compact slick alongside several hard targets — the "
-                  "signature of an operational discharge at anchor."),
+        "blurb": ("A compact slick alongside several hard targets. No vessel is "
+                  "attributed to it — the AIS correlation for this scene was "
+                  "inconclusive."),
     },
     {
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (8).jpeg",
         "key": "lookalike_field",
         "title": "Low-wind field — look-alike",
-        "mmsi": 645079210,
-        "vessel": "FV SEA HARVESTER 7",
+        "mmsi": None,
+        "vessel": "AOI survey pass",
         "captured": "2020-07-25 15:40 UTC",
         "position": [-20.4750, 57.9400],
         "blurb": ("Extensive dark formations that are NOT oil. The segmenter "
@@ -76,8 +80,8 @@ SCENES = [
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (6).jpeg",
         "key": "coastal_lookalike",
         "title": "Coastal water — sheltered calm",
-        "mmsi": 563114900,
-        "vessel": "BULK PIONEER",
+        "mmsi": None,
+        "vessel": "AOI survey pass",
         "captured": "2020-07-25 15:10 UTC",
         "position": [-20.2100, 58.2600],
         "blurb": ("Wave shadow in the lee of the coast. Dark, adjacent to land, "
@@ -87,8 +91,8 @@ SCENES = [
         "src": "WhatsApp Image 2026-08-27 at 8.32.30 AM (2).jpeg",
         "key": "clean_coastal",
         "title": "Clean coastal pass",
-        "mmsi": 256891004,
-        "vessel": "MSC CAP FLORES",
+        "mmsi": None,
+        "vessel": "AOI survey pass",
         "captured": "2020-07-25 15:25 UTC",
         "position": [-20.5300, 57.8100],
         "blurb": "Negative control — coastline and open water, no dark formations.",

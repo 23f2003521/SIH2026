@@ -44,3 +44,7 @@ models/best_sar_model.pth
 !assets/sar_samples/scenes/*.jpg
 !assets/sar_samples/scenes/*.png
 assets/sar_samples/raw/
+
+# The real Mauritius AOI AIS extract (July 2020) is the app's primary data
+# source, not a bulk dataset. The blanket *.csv rule above is for the latter.
+!assets/ais/*.csv

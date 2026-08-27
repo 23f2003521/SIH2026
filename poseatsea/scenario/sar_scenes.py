@@ -9,10 +9,9 @@ illustrations, and not hand-drawn. Precomputing buys two things that matter in
 a live demo: the page renders instantly, and it never has to load the 110 MB
 SegFormer to show a result. Uploading a new scene still runs the model.
 
-Each scene is tied to a vessel from the AIS scenario so the two halves of the
-console agree with each other: the casualty carries the major slick, the
-runner-up suspect a small discharge, and the trawler that the anomaly detector
-over-flags carries a scene that is pure look-alike.
+Only the Wakashio scene names a vessel. Every other ship in the AIS feed is a
+real, named, innocent vessel, so the remaining scenes are presented as AOI
+survey passes identified by place and time rather than pinned on someone.
 """
 from __future__ import annotations
 
@@ -33,7 +32,7 @@ class SarScene:
     key: str
     title: str
     vessel: str
-    mmsi: int
+    mmsi: Optional[int]
     captured: str
     position: List[float]
     blurb: str
@@ -52,6 +51,11 @@ class SarScene:
     @property
     def label(self) -> str:
         return f"{self.vessel} — {self.title}"
+
+    @property
+    def attributed(self) -> bool:
+        """Only scenes tied to a documented polluter name a vessel."""
+        return self.mmsi is not None
 
     def load_image(self) -> np.ndarray:
         from ..inference.sar import read_image
@@ -103,7 +107,8 @@ def by_key(key: str) -> Optional[SarScene]:
 
 
 def by_mmsi(mmsi: int) -> Optional[SarScene]:
-    return next((s for s in load_scenes() if s.mmsi == int(mmsi)), None)
+    return next((s for s in load_scenes()
+                 if s.mmsi is not None and s.mmsi == int(mmsi)), None)
 
 
 def available() -> bool:

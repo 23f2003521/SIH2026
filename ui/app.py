@@ -84,9 +84,9 @@ def sidebar() -> str:
         st.divider()
         st.markdown(
             f"<div style='font-size:.7rem;color:{theme.MUTED};line-height:1.6'>"
-            f"Demonstration scenario reconstructs the <b>MV Wakashio</b> grounding "
-            f"(Mauritius, 25 July 2020) from the public casualty record. "
-            f"AIS pings are synthesis, not recovered signal.</div>",
+            f"Real AIS &mdash; Mauritius AOI, July 2020. The <b>MV Wakashio</b> "
+            f"grounding of 25 July 2020 is recorded in this feed by the "
+            f"vessel itself.</div>",
             unsafe_allow_html=True,
         )
     return choice

@@ -20,13 +20,13 @@ pip install -r requirements.txt
 streamlit run ui/app.py
 ```
 
-Opens on <http://localhost:8501>. No internet connection is required at runtime —
-charts render offline and no basemap tiles are fetched.
+Opens on <http://localhost:8501>. Maps use Esri satellite tiles and need network at
+view time; set `POSEATSEA_OFFLINE_MAPS=1` to fall back to a plain dark canvas.
 
 Verify the install:
 
 ```bash
-pytest tests/ -q          # 37 tests: models, guard rails, API contract, every page
+pytest tests/ -q          # 46 tests: models, guard rails, API contract, every page
 ```
 
 ---
@@ -35,11 +35,11 @@ pytest tests/ -q          # 37 tests: models, guard rails, API contract, every p
 
 | Page | What it does |
 |---|---|
-| **Incident console** | The whole story on one screen — traffic, flags, and the attributed vessel. |
-| **SAR segmentation** | Upload a Sentinel-1 scene; get a 5-class mask, area estimate and slick breakdown. |
-| **AIS anomalies** | Per-ping anomaly scoring across the fleet, down to which feature drove each flag. |
-| **Trajectory** | Predicted next position against the vessel's actual track, with a deviation trace. |
-| **Attribution** | Ranks candidate vessels against a slick, showing every component of the score. |
+| **Overview** | The whole story on one satellite map — traffic, flags, and the attributed vessel. |
+| **Route Deviation (LSTM)** | Predicted next position against the vessel's actual track, with a deviation trace. |
+| **AIS Anomaly Detection** | Per-ping scoring across the fleet, down to which feature drove each flag. |
+| **SAR Oil Spill Segmenter** | Five real Sentinel-1 scenes, or upload your own for live inference. |
+| **Attribution Pipeline** | Ranks candidate vessels against a slick, showing every component of the score. |
 | **System** | Model residency, load timings, reported accuracy, and declared limitations. |
 
 ---
@@ -56,8 +56,9 @@ poseatsea/
     trajectory.py        LSTM next-position + operating-envelope guard
     ais.py               autoencoder anomaly scoring + feature engineering
   scenario/
-    wakashio.py          reconstructed MV Wakashio incident
-    synthetic_sar.py     synthetic radar frames (plumbing test only)
+    real_ais.py          the Mauritius AOI feed (canonical data source)
+    wakashio.py          documented casualty facts
+    sar_scenes.py        precomputed Sentinel-1 scene library
 api/main.py              optional FastAPI inference service
 ui/                      Streamlit console (engine, theme, charts, views)
 tests/                   pipeline, API and page smoke tests
@@ -130,41 +131,40 @@ Out-of-AOI input is refused outright rather than answered wrongly.
 
 ---
 
-## Demonstration data
+## Data — all of it real
 
-No AIS feed or SAR imagery was supplied with the models, so the console ships with a
-**reconstruction of the MV Wakashio grounding** (Pointe d'Esny, Mauritius,
-25 July 2020) — the case study named in the project brief, and the same water and
-month the trajectory model was normalised for.
+**AIS.** A Mauritius AOI extract covering 1–31 July 2020: 27,979 records,
+231 vessels, the same region and month the trajectory model was normalised for.
+**The MV Wakashio's grounding is in this feed, broadcast by the ship itself.**
 
-Vessel particulars, voyage, grounding position and timing follow the public casualty
-record. **The individual AIS pings are physically consistent synthesis, not recovered
-signal.** Tracks are generated from waypoints with a speed profile; course, rate of
-turn and positional deltas are all derived from the resulting geometry, so every field
-the models consume agrees with every other one. The console labels this on every page.
+Straight from the data, nothing asserted by hand:
 
-The scenario also carries five contemporaneous vessels, which is what makes the
-demonstration honest — attribution only means something if the system had innocent
-traffic available to blame and did not blame it.
+- She transits south-west at 11.6–12.0 kn on courses 245–247°.
+- Her last ping with way on is 2020-07-25 **15:27:22 UTC** at −20.44421,
+  57.74328 — already down to 1.7 kn.
+- **84 seconds later** she reports 0.2 kn, and never moves again.
+- From there she broadcasts navigational status **6 — Aground** for six days.
 
-One deliberate result: **an inshore trawler carries the highest raw anomaly score in
-the window, not the casualty.** Tight repeated turns are kinematically anomalous and
-entirely lawful. Behaviour alone would nominate the wrong vessel; only correlation with
-the spill's position resolves it. That is the argument for fusion, made concrete.
+15:27 UTC is 19:27 local, matching the casualty record's 19:25 to within two
+minutes. The console derives the grounding position and time from the feed
+rather than hardcoding them; a test asserts they land on the documented site.
 
-### SAR imagery — read this before demoing
+The five other vessels on screen — KOTA SURIA, VERY MARIA, DHT EDELWEISS,
+PALONA, AQUAVITA SOL — are real ships that were really there that day, chosen
+for track density. They are the control group: attribution only means something
+if the system had innocent traffic available to blame and did not blame it. It
+scores the Wakashio at **0.936** and clears every one of them by proximity.
 
-The synthetic radar generator (`scenario/synthetic_sar.py`) is a **plumbing test, not
-imagery**. Those frames are out of distribution for the segmenter, which responds to
-them almost identically regardless of what was drawn — the clean-sea control returns
-*more* oil pixels than the slick scenes. They prove the model loads and runs; they say
-nothing about accuracy.
+Only the *background* is documentary rather than measured: owner, tonnage,
+voyage, and what happened after she stopped moving. Those come from the public
+casualty record and live in `scenario/wakashio.py`.
 
-**For a real demonstration, supply Sentinel-1 scenes** from the Krestenitis et al.
-oil-spill benchmark the weights were trained on (1002 train / 110 test). Any file from
-its `test/images/` folder is a valid input to the upload path.
-
----
+**SAR.** Five real Sentinel-1 scenes with the masks the shipped checkpoint
+produced for them, precomputed by `deploy/build_sar_scenes.py` so the page
+renders without loading the 110 MB segmenter. Uploading a scene runs the model
+live. Only the Wakashio scene names a vessel — every other ship in the feed is
+real, named and innocent, and pinning an oil signature on one of them to make a
+neater demo would be indefensible.
 
 ## Declared limitations
 
@@ -180,7 +180,7 @@ its `test/images/` folder is a valid input to the upload path.
    vessels for review; it cannot clear one.
 4. **Area estimates are approximate.** The mask is a 256×256 resample of the source
    scene, and ground resolution is an operator-supplied assumption.
-5. **The demonstration AIS is reconstructed**, as described above.
+5. **The AIS is real**, as described above; only the documentary background is not.
 6. **Attribution weights are a policy choice, not a measurement**, and are exposed in
    the UI so they can be argued with.
 
