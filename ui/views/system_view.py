@@ -162,8 +162,9 @@ These are stated here rather than discovered in a demo.
    returns nothing outside it. Use elsewhere requires retraining.
 3. **The anomaly detector misses more than it catches.** Recall is 0.41. It nominates
    vessels for review; it cannot clear one.
-4. **Area estimates are approximate.** The segmentation mask is a 512×512 resample of
-   the source scene, and ground resolution is an operator-supplied assumption.
+4. **Area estimates are approximate.** The 512×512 network output is resampled back to
+   the source resolution before measuring, so a pixel is genuinely the stated ground
+   size — but the resample carries error, and ground resolution is your assumption.
 5. **The AIS is real.** A Mauritius AOI extract for July 2020 containing the
    Wakashio's own broadcasts. Only the documented background (owner, tonnage,
    voyage, what happened after she stopped) comes from the casualty record.

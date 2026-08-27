@@ -98,7 +98,9 @@ def overlay_on_image(image_rgb: np.ndarray, mask: np.ndarray, alpha: float = 0.4
     class indices that correspond to no real class.
     """
     h, w = image_rgb.shape[:2]
-    full = cv2.resize(mask.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
+    full = mask.astype(np.uint8)
+    if full.shape[:2] != (h, w):
+        full = cv2.resize(full, (w, h), interpolation=cv2.INTER_NEAREST)
     shown = classes if classes is not None else tuple(CLASS_COLORS_RGB)
 
     out = image_rgb.astype(np.float32).copy()
@@ -118,8 +120,14 @@ def estimate_area_km2(mask: np.ndarray, cls: int = OIL_CLASS,
     """
     Approximate ground area of one class.
 
-    The mask is a 512x512 resample of the source scene, so resampling error is
-    baked in -- always present this as approximate.
+    `mask` MUST be at the source scene's resolution, not the model's 512x512
+    output, because only then does one mask pixel correspond to
+    `pixel_resolution_m` on the ground.
+
+    Counting on the raw 512x512 output instead is a silent and substantial
+    error: a 1250x650 Sentinel-1 scene covers 12.5 km x 6.5 km, so each 512x512
+    pixel spans 24.4 m x 12.7 m -- 3.1x the area of the 10 m pixel the formula
+    assumes. `segment()` resizes before measuring for exactly this reason.
     """
     km2_per_pixel = (pixel_resolution_m / 1000.0) ** 2
     return float((mask == cls).sum() * km2_per_pixel)
@@ -145,7 +153,9 @@ def _components(mask: np.ndarray, cls: int, top_k: int = 5) -> List[Dict[str, An
 
 @dataclass
 class SarResult:
-    mask: np.ndarray
+    mask: np.ndarray                 # at SOURCE resolution -- overlay and measure with this
+    mask_native: np.ndarray          # raw 512x512 model output, before upsampling
+    source_size: Tuple[int, int]     # (width, height) of the scene the mask was fitted to
     class_pixels: Dict[int, int]
     class_fraction: Dict[int, float]
     oil_area_km2: float
@@ -196,13 +206,26 @@ class SarResult:
 
 def segment(model, image_rgb: np.ndarray,
             pixel_resolution_m: float = DEFAULT_PIXEL_RESOLUTION_M) -> SarResult:
-    """Run the segmenter over one RGB scene and summarise the result."""
+    """
+    Run the segmenter over one RGB scene and summarise the result.
+
+    The network always emits 512x512 regardless of input size. That output is
+    immediately resampled back to the source scene's dimensions with
+    INTER_NEAREST, and every downstream measurement -- areas, connected
+    components, class fractions -- is taken from the resampled mask. Measuring
+    on the raw 512x512 grid would misreport ground area by the scene's aspect
+    ratio (3.1x on a standard 1250x650 Sentinel-1 frame).
+    """
+    h, w = image_rgb.shape[:2]
     tensor = preprocess(image_rgb)
     start = time.perf_counter()
     with torch.no_grad():
         logits = model(tensor)
-        mask = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+        native = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
     elapsed_ms = (time.perf_counter() - start) * 1000.0
+
+    # NEAREST only: interpolation would invent fractional class indices.
+    mask = cv2.resize(native, (w, h), interpolation=cv2.INTER_NEAREST)
 
     total = mask.size
     class_pixels = {c: int((mask == c).sum()) for c in range(NUM_CLASSES)}
@@ -210,6 +233,8 @@ def segment(model, image_rgb: np.ndarray,
 
     return SarResult(
         mask=mask,
+        mask_native=native,
+        source_size=(w, h),
         class_pixels=class_pixels,
         class_fraction=class_fraction,
         oil_area_km2=estimate_area_km2(mask, OIL_CLASS, pixel_resolution_m),

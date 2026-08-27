@@ -134,7 +134,7 @@ def models() -> Dict[str, Any]:
             "normalised for.",
             "The anomaly detector has 0.41 recall: it nominates vessels for "
             "review and cannot clear one.",
-            "Spill area figures are approximate -- the mask is a 512x512 resample.",
+            "Spill area figures are approximate -- the 512x512 output is resampled to the source resolution before measuring, but the resample carries error.",
         ],
     }
 

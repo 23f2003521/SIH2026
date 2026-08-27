@@ -102,7 +102,7 @@ def test_sar_segment_accepts_an_upload(client):
     body = r.json()
     assert r.status_code == 200
     assert "oil_area_km2" in body
-    assert sum(body["class_pixels"].values()) == SAR_INPUT_SIZE * SAR_INPUT_SIZE
+    assert sum(body["class_pixels"].values()) == 256 * 256   # resampled to source
 
 
 def test_sar_rejects_a_non_image(client):

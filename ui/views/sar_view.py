@@ -79,11 +79,12 @@ def _library_view() -> None:
 
     theme.provenance(
         f"Real Sentinel-1 scene at {scene.source_size[0]}×{scene.source_size[1]} from the "
-        f"Krestenitis benchmark; the mask is the shipped checkpoint's own output, precomputed "
-        f"at {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE} so the page renders without loading the 110 MB "
-        f"segmenter. Pairing a scene with a vessel's operating area is a presentational "
-        f"choice — the segmentation is genuine, the geographic pairing is for demonstration. "
-        f"Area figures are approximate."
+        f"Krestenitis benchmark. The network emits {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE}; that "
+        f"output is resampled back to the source resolution with nearest-neighbour before "
+        f"any area is measured, so a pixel really is {scene.pixel_resolution_m:.0f} m on the "
+        f"ground. Precomputed so the page renders without loading the 110 MB segmenter. "
+        f"Pairing a scene with a vessel's operating area is presentational — the segmentation "
+        f"is genuine model output."
     )
 
 
@@ -205,9 +206,10 @@ def _upload_view() -> None:
     _legend()
 
     theme.provenance(
-        f"Live inference at {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE}. Area figures are approximate: "
-        f"the mask is a resample of the source scene, so resampling error is carried into "
-        f"every pixel count."
+        f"Live inference. The network consumes and emits {SAR_INPUT_SIZE}×{SAR_INPUT_SIZE}; "
+        f"the mask is resampled back to your scene's resolution before area is measured. "
+        f"Figures remain approximate — ground resolution is your assumption, and the "
+        f"resample carries its own error."
     )
 
 
@@ -250,7 +252,7 @@ def _imagery(image, mask, alpha, class_pixels, resolution, slicks=None) -> None:
             st.image(image, use_container_width=True, caption="Source SAR scene")
         with b:
             st.image(mask_rgb, use_container_width=True,
-                     caption=f"Predicted classes ({SAR_INPUT_SIZE}×{SAR_INPUT_SIZE})")
+                     caption="Predicted classes, resampled to the source resolution")
     with t3:
         st.image(mask_rgb, use_container_width=True,
                  caption="Raw class mask in the dataset palette")

@@ -104,6 +104,24 @@ Not a soft preference. The same real scene, same weights:
 The updated spec states this and it is confirmed here. `SAR_INPUT_SIZE` is fixed
 in `config.py` and deliberately not exposed as a UI setting.
 
+### Measuring on the raw output understates area 3.1×
+
+The network always emits 512×512 whatever you feed it. A Sentinel-1 frame is
+1250×650 covering 12.5 km × 6.5 km, so one raw output pixel spans
+**24.4 m × 12.7 m — 3.1× the area of the 10 m pixel the formula assumes.**
+
+Counting oil pixels on the raw grid therefore understates the slick by that
+factor, and does so silently: the number looks entirely plausible.
+
+| Scene | Measured on raw 512×512 | Measured at source resolution |
+|---|---|---|
+| Wakashio, Pointe d'Esny | 1.38 km² | **4.28 km²** |
+| Kota Suria, outer lane | 0.19 km² | **0.60 km²** |
+
+`segment()` now resamples with `INTER_NEAREST` to the source dimensions before
+any measurement, and `test_area_is_measured_at_source_resolution` asserts the
+five class areas sum to the scene's true ground extent.
+
 ---
 
 ## 6. Finding: the trajectory model's cadence and heading envelope

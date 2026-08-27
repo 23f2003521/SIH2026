@@ -60,9 +60,38 @@ def test_sar_emits_five_classes():
     rng = np.random.default_rng(0)
     img = (rng.random((320, 480, 3)) * 255).astype(np.uint8)
     result = sar_mod.segment(model, img)
-    assert result.mask.shape == (SAR_INPUT_SIZE, SAR_INPUT_SIZE)
+
+    # The network emits 512x512; the result is resampled back to the source.
+    assert result.mask_native.shape == (SAR_INPUT_SIZE, SAR_INPUT_SIZE)
+    assert result.mask.shape == (320, 480)
+    assert result.source_size == (480, 320)
     assert result.mask.min() >= 0 and result.mask.max() <= 4
-    assert sum(result.class_pixels.values()) == SAR_INPUT_SIZE * SAR_INPUT_SIZE
+    assert sum(result.class_pixels.values()) == 320 * 480
+
+
+def test_area_is_measured_at_source_resolution():
+    """
+    Guards a silent 3x error. The model always emits 512x512, but a Sentinel-1
+    frame is 1250x650 -- so one raw output pixel spans 24.4 m x 12.7 m, not the
+    10 m the area formula assumes. Measuring before resampling understates
+    ground area by the scene's aspect ratio.
+    """
+    model = get_registry()["sar"].get()
+    rng = np.random.default_rng(1)
+    img = (rng.random((650, 1250, 3)) * 255).astype(np.uint8)
+    result = sar_mod.segment(model, img, pixel_resolution_m=10.0)
+
+    scene_km2 = (1250 * 10 / 1000) * (650 * 10 / 1000)          # 81.25 km2
+    measured = sum(
+        sar_mod.estimate_area_km2(result.mask, c, 10.0) for c in range(5)
+    )
+    assert measured == pytest.approx(scene_km2, rel=1e-6)
+
+    # The same count taken on the raw 512x512 grid would be ~3.1x too small.
+    naive = sum(
+        sar_mod.estimate_area_km2(result.mask_native, c, 10.0) for c in range(5)
+    )
+    assert naive == pytest.approx(scene_km2 / 3.1, rel=0.02)
 
 
 def test_mask_upsampling_invents_no_classes():
@@ -345,17 +374,24 @@ def test_every_scene_names_a_vessel_from_the_real_feed(scenario):
 
 def test_only_the_casualty_scene_carries_a_major_slick(scored):
     """
-    Naming innocent vessels is fine; implying they spilled is not. Only the
-    casualty's scene may show a major slick, and any vessel whose scene does
-    show oil must still be cleared by its own AIS.
+    Naming innocent vessels is fine; implying they spilled is not.
+
+    The bar is relative, not a magic number: no innocent vessel's scene may
+    approach the casualty's, and any vessel whose scene does show oil must
+    still read clean on its own AIS so the console clears it.
     """
     from poseatsea.scenario import sar_scenes
-    for sc in sar_scenes.load_scenes():
-        if sc.mmsi == WAKASHIO_MMSI:
-            assert sc.oil_area_km2 > 1.0
+    scenes = {sc.mmsi: sc for sc in sar_scenes.load_scenes()}
+    casualty = scenes[WAKASHIO_MMSI]
+    assert casualty.oil_area_km2 > 1.0
+
+    for mmsi, sc in scenes.items():
+        if mmsi == WAKASHIO_MMSI:
             continue
-        assert sc.oil_area_km2 < 0.5, f"{sc.vessel} must not carry a major slick"
-        track = scored[scored["mmsi"] == sc.mmsi]
+        assert sc.oil_area_km2 < casualty.oil_area_km2 / 3, (
+            f"{sc.vessel} carries {sc.oil_area_km2:.2f} km2 against the casualty's "
+            f"{casualty.oil_area_km2:.2f} -- too close to read as innocent")
+        track = scored[scored["mmsi"] == mmsi]
         assert track["is_anomaly"].mean() < 0.05, f"{sc.vessel} should read as clean"
 
 
