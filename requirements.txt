@@ -30,6 +30,11 @@ pillow>=10.0
 streamlit>=1.40
 altair>=5.0
 
+# Satellite basemaps (Esri World Imagery, no API key). Needs network at view
+# time; set POSEATSEA_OFFLINE_MAPS=1 to fall back to a plain dark canvas.
+folium>=0.17
+streamlit-folium>=0.20
+
 # Lets the app pull weights from a Hugging Face repo when they are not in the
 # checkout -- required on hosts that do not resolve Git LFS pointers, such as
 # Streamlit Community Cloud. See poseatsea/weights.py.

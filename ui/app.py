@@ -33,12 +33,14 @@ from ui.views import (  # noqa: E402
 
 theme.inject()
 
+# Names deliberately match the pipeline vocabulary the team already uses, so
+# the navigation reads the same way the problem statement does.
 PAGES = {
-    "Incident console": ("🎯", overview.render),
-    "SAR segmentation": ("🛰", sar_view.render),
-    "AIS anomalies": ("📡", ais_view.render),
-    "Trajectory": ("🧭", trajectory_view.render),
-    "Attribution": ("⚖", attribution_view.render),
+    "Overview": ("🎯", overview.render),
+    "Route Deviation (LSTM)": ("🧭", trajectory_view.render),
+    "AIS Anomaly Detection": ("📡", ais_view.render),
+    "SAR Oil Spill Segmenter": ("🛰", sar_view.render),
+    "Attribution Pipeline": ("⚖", attribution_view.render),
     "System": ("⚙", system_view.render),
 }
 
@@ -63,9 +65,11 @@ def sidebar() -> str:
                           label_visibility="collapsed")
 
         st.divider()
+        _fleet_monitor()
+        st.divider()
 
         # Live model residency, so the cost of the heavy model is never hidden.
-        st.markdown(f"<div class='pos-label'>Model registry</div>", unsafe_allow_html=True)
+        st.markdown("<div class='pos-label'>Model registry</div>", unsafe_allow_html=True)
         for m in engine.registry().status()["models"]:
             dot = theme.GOOD if m["loaded"] else theme.LINE
             detail = f"{m['load_seconds']:.1f}s" if m["loaded"] else "idle"
@@ -86,6 +90,47 @@ def sidebar() -> str:
             unsafe_allow_html=True,
         )
     return choice
+
+
+def _fleet_monitor() -> None:
+    """
+    Per-vessel status cards.
+
+    The sidebar is the one surface visible on every page, so it carries the
+    fleet at a glance: who is being tracked, and who the detector has flagged.
+    """
+    scored = engine.scored_ais()
+    st.markdown("<div class='pos-label'>Fleet monitor</div>", unsafe_allow_html=True)
+
+    rollup = scored.groupby("mmsi").agg(
+        name=("vessel_name", "first"),
+        flag=("flag", "first"),
+        vtype=("vessel_type", "first"),
+        flagged=("is_anomaly", "sum"),
+        peak=("anomaly_score", "max"),
+    ).reset_index().sort_values("peak", ascending=False)
+
+    for r in rollup.itertuples():
+        last = scored[scored["mmsi"] == r.mmsi].iloc[-1]
+        if r.flagged:
+            status, color = "FLAGGED", theme.CRITICAL
+        else:
+            status, color = "Normal", theme.GOOD
+        st.markdown(
+            f"""<div style="background:{theme.PANEL_2};border:1px solid {theme.LINE};
+ border-left:3px solid {color};border-radius:8px;padding:8px 11px;margin-bottom:7px">
+  <div style="font-size:.8rem;font-weight:660;color:{theme.TEXT}">{r.name}</div>
+  <div style="font-size:.68rem;color:{theme.MUTED};margin-top:1px">
+    MMSI {r.mmsi} &middot; {r.flag}<br>{r.vtype}
+  </div>
+  <div style="margin-top:5px;font-size:.71rem">
+    <span style="color:{color};font-weight:640">{status}</span>
+    <span style="color:{theme.MUTED}"> &nbsp;{last['speed']:.1f} kn
+      &nbsp;{last['course']:.0f}&deg;</span>
+  </div>
+</div>""",
+            unsafe_allow_html=True,
+        )
 
 
 def main() -> None:

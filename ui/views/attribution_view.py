@@ -6,11 +6,13 @@ import streamlit as st
 
 from poseatsea import fusion
 
-from .. import charts, engine, theme
+from streamlit_folium import st_folium
+
+from .. import charts, engine, maps, theme
 
 
 def render() -> None:
-    st.markdown("## Spill attribution")
+    st.markdown("## Attribution pipeline")
     st.markdown(
         f"<span style='color:{theme.MUTED}'>Correlates a detected slick against every "
         f"vessel in the area on four measurable axes. The ranking is a transparent "
@@ -84,14 +86,12 @@ def render() -> None:
                    f"and change them.")
     with right:
         st.markdown("##### Traffic against the slick")
-        st.altair_chart(
-            charts.traffic_plan_view(
-                engine.scored_ais(),
-                spill={"latitude": lat, "longitude": lon},
-                highlight_mmsi=top["mmsi"],
-                height=300,
-            ),
-            use_container_width=True,
+        st_folium(
+            maps.traffic_map(engine.scored_ais(),
+                             spill={"latitude": lat, "longitude": lon},
+                             highlight_mmsi=top["mmsi"]),
+            use_container_width=True, height=420, returned_objects=[],
+            key="attribution_map",
         )
 
     with st.expander("Comparison table"):

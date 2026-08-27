@@ -21,8 +21,8 @@ warnings.filterwarnings("ignore")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 APP = str(ROOT / "ui" / "app.py")
-PAGES = ["Incident console", "SAR segmentation", "AIS anomalies",
-         "Trajectory", "Attribution", "System"]
+PAGES = ["Overview", "Route Deviation (LSTM)", "AIS Anomaly Detection",
+         "SAR Oil Spill Segmenter", "Attribution Pipeline", "System"]
 
 
 def _run(page: str) -> AppTest:
@@ -39,15 +39,15 @@ def test_page_renders(page: str) -> None:
     assert not at.exception, f"{page} raised: {at.exception}"
 
 
-def test_incident_console_names_the_suspect() -> None:
-    at = _run("Incident console")
+def test_overview_names_the_suspect() -> None:
+    at = _run("Overview")
     body = " ".join(m.value for m in at.markdown)
     assert "WAKASHIO" in body
     assert "Reconstructed scenario" in body
 
 
 def test_ais_page_warns_about_the_trawler() -> None:
-    at = _run("AIS anomalies")
+    at = _run("AIS Anomaly Detection")
     body = " ".join(m.value for m in at.markdown)
     assert "trawler" in body.lower()
 

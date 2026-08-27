@@ -29,6 +29,8 @@ pillow>=10.0
 # README.md controls it. Pinning it in both places makes pip and the Space
 # builder install different versions.
 altair>=5.0
+folium>=0.17
+streamlit-folium>=0.20
 
 # Only needed if the weights are fetched from the Hub rather than committed via
 # LFS (i.e. if you set POSEATSEA_WEIGHTS_REPO). Harmless to leave installed.

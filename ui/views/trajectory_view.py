@@ -7,11 +7,13 @@ import streamlit as st
 from poseatsea.config import SEQ_LEN, TRAJ_P90_ERROR_KM
 from poseatsea.inference import trajectory as traj_mod
 
-from .. import charts, engine, theme
+from streamlit_folium import st_folium
+
+from .. import charts, engine, maps, theme
 
 
 def render() -> None:
-    st.markdown("## Trajectory prediction")
+    st.markdown("## Route deviation detection")
     card = traj_mod.model_card()
     st.markdown(
         f"<span style='color:{theme.MUTED}'>A 2-layer LSTM maps a vessel's last "
@@ -86,25 +88,42 @@ def render() -> None:
         theme.banner(w, "warn")
 
     # ------------------------------------------------------------------ plots
-    left, right = st.columns([1.2, 1])
+    left, right = st.columns([1.6, 1])
     with left:
         st.markdown("##### Predicted against actual")
-        st.altair_chart(
-            charts.prediction_detail(history, pred.predicted_lat, pred.predicted_lon, actual),
-            use_container_width=True,
+        st_folium(
+            maps.trajectory_map(track, history, pred.predicted_lat, pred.predicted_lon,
+                                actual=actual, deviation_km=dev),
+            use_container_width=True, height=520, returned_objects=[],
+            key=f"traj_map_{mmsi}_{start}",
         )
-        st.caption("Grey line is the 8-ping history the model saw. Triangle is its "
-                   "prediction; circle is where the vessel actually reported next.")
+        st.markdown(maps.legend([
+            {"color": theme.GOOD, "label": "History the model saw (8 pings)"},
+            {"color": theme.ACCENT, "label": "LSTM predicted next position"},
+            {"color": theme.WARN, "label": "Deviation"},
+            {"color": theme.CRITICAL, "label": "Reef hazard"},
+        ]), unsafe_allow_html=True)
+        st.caption("Zoom in on the red ring to see predicted versus actual separate.")
     with right:
         st.markdown("##### The window the model saw")
         cols = ["timestamp", "latitude", "longitude", "speed", "course", "rot"]
-        st.dataframe(history[cols], use_container_width=True, hide_index=True, height=310)
+        st.dataframe(history[cols], use_container_width=True, hide_index=True, height=330)
 
     # ------------------------------------------------------------------ full trace
     if trace is not None and len(trace):
         st.markdown("##### Deviation across the whole transit")
-        st.altair_chart(charts.deviation_timeline(trace, TRAJ_P90_ERROR_KM),
-                        use_container_width=True)
+        mcol, tcol = st.columns([1.15, 1])
+        with mcol:
+            st_folium(
+                maps.deviation_map(track, trace),
+                use_container_width=True, height=400, returned_objects=[],
+                key=f"dev_map_{mmsi}",
+            )
+            st.caption("Each ping sized and coloured by how far it fell from the "
+                       "model's prediction — green predictable, red not.")
+        with tcol:
+            st.altair_chart(charts.deviation_timeline(trace, TRAJ_P90_ERROR_KM),
+                            use_container_width=True)
 
         c1, c2, c3 = st.columns(3)
         with c1:

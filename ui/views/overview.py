@@ -6,7 +6,9 @@ import streamlit as st
 from poseatsea.config import AE_THRESHOLD
 from poseatsea.scenario.wakashio import INCIDENT
 
-from .. import charts, engine, theme
+from streamlit_folium import st_folium
+
+from .. import charts, engine, maps, theme
 
 
 def render() -> None:
@@ -14,7 +16,7 @@ def render() -> None:
     incident = sc["incident"]
     vessel = incident["vessel"]
 
-    st.markdown("## Incident console")
+    st.markdown("## Maritime surveillance overview")
     st.markdown(
         f"#### {incident['name']} &nbsp;<span style='color:{theme.MUTED};font-weight:400'>"
         f"{incident['location']}</span>",
@@ -63,17 +65,21 @@ def render() -> None:
 
     with left:
         st.markdown("##### Traffic in the area of interest")
-        st.altair_chart(
-            charts.traffic_plan_view(
-                scored, spill={"latitude": spill_lat, "longitude": spill_lon},
-                highlight_mmsi=vessel["mmsi"],
-            ),
-            use_container_width=True,
+        st_folium(
+            maps.traffic_map(scored,
+                             spill={"latitude": spill_lat, "longitude": spill_lon},
+                             highlight_mmsi=vessel["mmsi"]),
+            use_container_width=True, height=520, returned_objects=[],
+            key="overview_map",
         )
+        st.markdown(maps.legend([
+            {"color": theme.CRITICAL, "label": "MV Wakashio (suspect)"},
+            {"color": theme.WARN, "label": "Flagged AIS ping"},
+            {"color": theme.ACCENT, "label": "Other traffic"},
+        ]), unsafe_allow_html=True)
         theme.provenance(
-            "Plan view in plain lat/lon &mdash; no basemap tiles, so the console runs "
-            "offline. Diamonds mark AIS pings the autoencoder flagged; the cross marks "
-            "the observed slick."
+            "Esri World Imagery. The red ring is the 5 km hazard radius around "
+            "Pointe d'Esny; amber dots are pings the autoencoder flagged."
         )
 
     with right:

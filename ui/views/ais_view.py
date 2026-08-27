@@ -8,7 +8,9 @@ from poseatsea.config import AE_THRESHOLD, FEATURE_ORDER
 from poseatsea.inference import ais as ais_mod
 from poseatsea.scenario.wakashio import to_csv_bytes
 
-from .. import charts, engine, theme
+from streamlit_folium import st_folium
+
+from .. import charts, engine, maps, theme
 
 
 def render() -> None:
@@ -50,10 +52,8 @@ def render() -> None:
             "warn",
         )
 
-        st.altair_chart(
-            charts.traffic_plan_view(scored, show_flags=True, height=420),
-            use_container_width=True,
-        )
+        st_folium(maps.traffic_map(scored), use_container_width=True,
+                  height=460, returned_objects=[], key="fleet_map")
 
     # ------------------------------------------------------------------ vessel
     with tab_vessel:
