@@ -35,8 +35,8 @@ theme.inject()
 # the navigation reads the same way the problem statement does.
 PAGES = {
     "Overview": overview.render,
-    "Route Deviation (LSTM)": trajectory_view.render,
     "AIS Anomaly Detection": ais_view.render,
+    "Route Deviation (LSTM)": trajectory_view.render,
     "SAR Oil Spill Segmenter": sar_view.render,
 }
 

@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 APP = str(ROOT / "ui" / "app.py")
-PAGES = ["Overview", "Route Deviation (LSTM)", "AIS Anomaly Detection",
+PAGES = ["Overview", "AIS Anomaly Detection", "Route Deviation (LSTM)",
          "SAR Oil Spill Segmenter"]
 
 
