@@ -126,3 +126,36 @@ MMSI {vessel['mmsi']} &middot; IMO {vessel['imo']}<br>
             unsafe_allow_html=True,
         )
 
+        st.markdown("")
+        dcol1, dcol2 = st.columns([1.75, 1])
+        with dcol1:
+            st.markdown(
+                f"""
+<div class="pos-card" style="border-left:3px solid {theme.ACCENT}">
+  <div class="pos-label">Maritime Law Enforcement &amp; Evidentiary Dossier</div>
+  <div style="font-size:.95rem;font-weight:600;margin:.2rem 0 .2rem">Official IMO / MARPOL Annex I Forensic Report</div>
+  <div class="pos-sub" style="font-size:.78rem;line-height:1.5">
+    Algorithmically compiles incident casualty telemetry, Sentinel-1 SAR slick classification metrics,
+    multi-criteria fleet attribution rankings, and SHA-256 chain-of-custody hashes
+    into an evidentiary PDF for Coast Guard, flag state, and port authority inquiries.
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        with dcol2:
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            from poseatsea import report as report_mod
+            pdf_data = report_mod.generate_dossier_pdf(
+                incident=incident,
+                attribution_results=results,
+            )
+            st.download_button(
+                label="📥 Export Forensic Dossier (PDF)",
+                data=pdf_data,
+                file_name=f"POSEATSEA_Forensic_Dossier_{vessel['mmsi']}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+
+

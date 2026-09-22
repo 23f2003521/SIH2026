@@ -30,7 +30,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import pandas as pd  # noqa: E402
-from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile  # noqa: E402
+from fastapi import Body, FastAPI, File, HTTPException, Query, Response, UploadFile  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 from poseatsea import __version__, fusion  # noqa: E402
@@ -279,3 +279,20 @@ def scenario(limit: int = Query(200, ge=1, le=5000)) -> Dict[str, Any]:
         "ais_sample": sc["ais"].head(limit).to_dict(orient="records"),
         "total_pings": len(sc["ais"]),
     }
+
+
+@app.get("/reports/dossier", tags=["reports"])
+def get_forensic_dossier(
+    scene_key: str = Query("wakashio_reef", description="SAR scene identifier"),
+) -> Response:
+    """Generate and return an official Coast Guard & maritime authority forensic PDF dossier."""
+    from poseatsea import report as report_mod
+    pdf_bytes = report_mod.generate_dossier_pdf(sar_scene_key=scene_key)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="POSEATSEA_Dossier_{scene_key}.pdf"'
+        },
+    )
+
