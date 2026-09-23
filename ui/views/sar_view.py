@@ -40,33 +40,62 @@ def _library_view() -> None:
     scenes = sar_scenes.load_scenes()
     labels = {s.label: s for s in scenes}
 
-    c1, c2 = st.columns([2.2, 1])
+    c1, c2, c3 = st.columns([2.0, 1.0, 1.2])
     with c1:
         chosen = st.selectbox("Scene", list(labels), label_visibility="collapsed")
     scene = labels[chosen]
     with c2:
         alpha = st.slider("Overlay opacity", 0.0, 1.0, 0.45, 0.05)
+    with c3:
+        run_live = st.toggle(
+            "⚡ Run live model",
+            value=False,
+            help="Run the real 110 MB PyTorch SegFormer model live on this scene rather than loading precomputed masks.",
+        )
 
     image = scene.load_image()
-    mask = scene.load_mask()
+
+    if run_live:
+        with st.spinner("Running SegFormer live inference..."):
+            result = engine.segment_image(image, scene.pixel_resolution_m)
+        mask = result.mask
+        class_pixels = {CLASS_NAMES[c]: n for c, n in result.class_pixels.items()}
+        oil_px = result.class_pixels.get(sar_mod.OIL_CLASS, 0)
+        look_px = result.class_pixels.get(sar_mod.LOOKALIKE_CLASS, 0)
+        oil_area = result.oil_area_km2
+        slicks = len(result.slicks)
+        footer = f"⚡ live inference {result.inference_ms:.0f} ms"
+        slicks_list = result.slicks
+        status_note = f"<b>Live SegFormer output:</b> {result.confidence_note()}"
+        tone = "warn" if look_px > oil_px else ("bad" if result.oil_detected else "good")
+    else:
+        mask = scene.load_mask()
+        class_pixels = scene.class_pixels
+        oil_px = scene.class_pixels.get("Oil Spill", 0)
+        look_px = scene.class_pixels.get("Look-alike", 0)
+        oil_area = scene.oil_area_km2
+        slicks = scene.slicks
+        footer = f"{scene.captured} &middot; precomputed"
+        slicks_list = None
+        status_note = f"<b>{scene.verdict()}</b> {scene.note}"
+        tone = "bad" if scene.oil_detected and scene.oil_area_km2 > 0.05 else (
+            "warn" if scene.lookalike_area_km2 > 0.5 else "good")
 
     _headline(
-        oil_px=scene.class_pixels.get("Oil Spill", 0),
-        look_px=scene.class_pixels.get("Look-alike", 0),
+        oil_px=oil_px,
+        look_px=look_px,
         total_px=mask.size,
-        oil_area=scene.oil_area_km2,
+        oil_area=oil_area,
         resolution=scene.pixel_resolution_m,
-        slicks=scene.slicks,
-        footer=f"{scene.captured}",
+        slicks=slicks,
+        footer=footer,
     )
 
-    tone = "bad" if scene.oil_detected and scene.oil_area_km2 > 0.05 else (
-        "warn" if scene.lookalike_area_km2 > 0.5 else "good")
-    theme.banner(f"<b>{scene.verdict()}</b> {scene.note}", tone)
+    theme.banner(status_note, tone)
 
     _vessel_crossref(scene)
 
-    _imagery(image, mask, alpha, scene.class_pixels, scene.pixel_resolution_m)
+    _imagery(image, mask, alpha, class_pixels, scene.pixel_resolution_m, slicks_list)
     _legend()
 
 

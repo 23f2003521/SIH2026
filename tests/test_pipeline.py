@@ -484,3 +484,22 @@ def engine_scored():
     from poseatsea.inference import ais as _ais
     model, scaler = get_registry()["ais_anomaly"].get()
     return _ais.score_frame(model, scaler, build_scenario()["ais"])
+
+
+def test_default_weights_repo_fallback():
+    """Ensure DEFAULT_WEIGHTS_REPO is configured for automatic fallback."""
+    from poseatsea import weights
+    assert weights.DEFAULT_WEIGHTS_REPO == "23f2003521/poseatsea-weights"
+
+
+def test_engine_segment_image_live():
+    """Verify live SegFormer execution via ui.engine.segment_image."""
+    from ui import engine
+    from poseatsea.scenario import sar_scenes
+
+    scene = sar_scenes.load_scenes()[0]
+    image = scene.load_image()
+    result = engine.segment_image(image, scene.pixel_resolution_m)
+    assert result.mask.shape == image.shape[:2]
+    assert result.inference_ms > 0
+

@@ -39,8 +39,11 @@ def is_lfs_pointer(path: Path) -> bool:
         return False
 
 
+DEFAULT_WEIGHTS_REPO = "23f2003521/poseatsea-weights"
+
+
 def _download(filename: str, dest_dir: Path) -> Path:
-    repo = os.getenv("POSEATSEA_WEIGHTS_REPO")
+    repo = os.getenv("POSEATSEA_WEIGHTS_REPO", DEFAULT_WEIGHTS_REPO)
     if not repo:
         raise FileNotFoundError(
             f"{filename} is missing from {dest_dir} and POSEATSEA_WEIGHTS_REPO is not "
@@ -72,8 +75,9 @@ def resolve(path: Path) -> Path:
     if path.exists() and not is_lfs_pointer(path):
         return path
 
+    repo = os.getenv("POSEATSEA_WEIGHTS_REPO", DEFAULT_WEIGHTS_REPO)
     if path.exists() and is_lfs_pointer(path):
-        if os.getenv("POSEATSEA_WEIGHTS_REPO"):
+        if repo:
             return _download(path.name, path.parent)
         raise RuntimeError(
             f"{path.name} is an unresolved Git LFS pointer, not the real weights "
