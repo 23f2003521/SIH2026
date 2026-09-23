@@ -39,3 +39,7 @@ streamlit-folium>=0.20
 # checkout -- required on hosts that do not resolve Git LFS pointers, such as
 # Streamlit Community Cloud. See poseatsea/weights.py.
 huggingface-hub>=0.24
+
+# --- reporting / forensics ------------------------------------------------
+reportlab>=4.0,<6
+
