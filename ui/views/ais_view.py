@@ -18,9 +18,10 @@ def render() -> None:
     scored = engine.scored_ais()
     rollup = ais_mod.vessel_rollup(scored)
 
-    tab_fleet, tab_vessel, tab_manual = st.tabs(
-        ["Fleet view", "Vessel detail", "Score a ping"]
+    tab_fleet, tab_vessel, tab_manual, tab_gaps = st.tabs(
+        ["Fleet view", "Vessel detail", "Score a ping", "Transponder Gaps (Dark Transits)"]
     )
+
 
     # ------------------------------------------------------------------ fleet
     with tab_fleet:
@@ -176,3 +177,83 @@ def render() -> None:
         if top:
             st.markdown("**Largest error contributors:** " +
                         ", ".join(f"`{f}` ({e:.3f})" for f, e in top))
+
+    # ------------------------------------------------------------------ gaps
+    with tab_gaps:
+        st.markdown("##### AIS Transponder Silence &amp; Dark Transits")
+        st.markdown(
+            "<div class='pos-sub' style='margin-bottom:12px'>"
+            "Monitors vessels transiting the Mauritius area of interest that cease AIS broadcasts for "
+            "prolonged periods (&ge; 30 minutes while underway). Cross-references silent transit vectors "
+            "against the oil slick / hazard zone to detect intentional transponder blackouts.</div>",
+            unsafe_allow_html=True,
+        )
+
+        from poseatsea import dark_vessels
+        sc = engine.scenario()
+        spill_lat, spill_lon = sc["spill_position"]
+
+        scan_mode = st.radio(
+            "Scan scope",
+            ["Full Month Extract (July 2020)", "Incident Day (25 July)"],
+            horizontal=True,
+        )
+
+        if scan_mode == "Full Month Extract (July 2020)":
+            from poseatsea.scenario.real_ais import clean_positions, load_raw
+            full_pos = clean_positions(load_raw())
+            gaps = dark_vessels.detect_transponder_gaps(
+                full_pos,
+                min_gap_minutes=30.0,
+                min_speed_knots=2.5,
+                spill_lat=spill_lat,
+                spill_lon=spill_lon,
+                hazard_radius_km=15.0,
+            )
+        else:
+            gaps = dark_vessels.detect_transponder_gaps(
+                scored,
+                min_gap_minutes=25.0,
+                min_speed_knots=2.0,
+                spill_lat=spill_lat,
+                spill_lon=spill_lon,
+                hazard_radius_km=15.0,
+            )
+
+        crossed_count = sum(1 for g in gaps if g.crossed_hazard_zone)
+        high_risk_count = sum(1 for g in gaps if g.risk_label == "high_risk_gap")
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.markdown(theme.metric_card("Transponder Gaps", str(len(gaps)), "&ge; 30 min underway"), unsafe_allow_html=True)
+        with c2:
+            st.markdown(theme.metric_card("Crossed Hazard Zone", str(crossed_count), "< 15 km to reef / slick", theme.WARN if crossed_count else theme.GOOD), unsafe_allow_html=True)
+        with c3:
+            st.markdown(theme.metric_card("High-Risk Blackouts", str(high_risk_count), "near hazard perimeter", theme.CRITICAL if high_risk_count else theme.GOOD), unsafe_allow_html=True)
+        with c4:
+            longest = f"{max((g.gap_minutes for g in gaps), default=0) / 60.0:.1f} hrs" if gaps else "--"
+            st.markdown(theme.metric_card("Longest Blackout", longest, "continuous silence"), unsafe_allow_html=True)
+
+        if gaps:
+            st.markdown("")
+            gap_rows = []
+            for g in gaps:
+                gap_rows.append({
+                    "Vessel": g.vessel_name,
+                    "MMSI": g.mmsi,
+                    "Flag": g.flag,
+                    "Type": g.vessel_type,
+                    "Duration": f"{g.gap_minutes / 60.0:.1f}h ({g.gap_minutes:.0f}m)",
+                    "Pre-Speed": f"{g.last_speed_kn:.1f} kn",
+                    "Post-Speed": f"{g.resume_speed_kn:.1f} kn",
+                    "Distance": f"{g.distance_km:.1f} km",
+                    "Implied Speed": f"{g.implied_speed_kn:.1f} kn",
+                    "Dist to Spill": f"{g.min_dist_to_spill_km:.1f} km",
+                    "Near Hazard": "YES" if g.crossed_hazard_zone else "No",
+                    "Risk Level": g.risk_label.upper(),
+                })
+            df_gaps = pd.DataFrame(gap_rows)
+            st.dataframe(df_gaps, use_container_width=True, hide_index=True, height=400)
+        else:
+            st.success("No transponder blackouts detected in this window.")
+

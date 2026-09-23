@@ -13,11 +13,13 @@ app ever has to run air-gapped.
 """
 from __future__ import annotations
 
+import math
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import folium
 import pandas as pd
+
 
 from poseatsea.config import CLASS_COLORS_RGB
 from poseatsea.scenario.wakashio import GROUNDING_LAT, GROUNDING_LON
@@ -234,6 +236,107 @@ def deviation_map(track: pd.DataFrame, trace: pd.DataFrame, height: int = 520) -
     return fmap
 
 
+def sar_dark_vessels_map(
+    scene_center: Tuple[float, float],
+    targets: List[Dict[str, Any]],
+    scene_size_px: Tuple[int, int] = (1250, 650),
+    pixel_res_m: float = 10.0,
+    spill_pos: Optional[Tuple[float, float]] = None,
+    height: int = 480,
+) -> folium.Map:
+    """
+    Satellite map displaying the SAR scene footprint, detected radar targets,
+    AIS-correlated cooperative vessels, and uncooperative dark vessels.
+    """
+    fmap = base_map(scene_center, zoom=11, height=height)
+    w_px, h_px = scene_size_px
+    r_earth = 6371000.0
+
+    # Calculate SAR scene geographic bounding box
+    dy_half = (h_px / 2.0) * pixel_res_m
+    dx_half = (w_px / 2.0) * pixel_res_m
+    dlat = (dy_half / r_earth) * (180.0 / 3.14159265)
+    cos_c = max(abs(math.cos(math.radians(scene_center[0]))), 1e-6)
+    dlon = (dx_half / (r_earth * cos_c)) * (180.0 / 3.14159265)
+
+    sw = [scene_center[0] - dlat, scene_center[1] - dlon]
+    ne = [scene_center[0] + dlat, scene_center[1] + dlon]
+
+    folium.Rectangle(
+        bounds=[sw, ne],
+        color=theme.ACCENT,
+        weight=1.5,
+        dash_array="4 4",
+        fill=True,
+        fill_color=theme.ACCENT,
+        fill_opacity=0.04,
+        tooltip="Sentinel-1 SAR Scene Footprint",
+    ).add_to(fmap)
+
+    lats = [sw[0], ne[0]]
+    lons = [sw[1], ne[1]]
+
+    # Spill marker if present
+    if spill_pos is not None:
+        folium.Circle(
+            spill_pos, radius=2000, color=theme.CRITICAL, weight=1.8,
+            fill=True, fill_color=theme.CRITICAL, fill_opacity=0.15,
+            tooltip="Confirmed Oil Slick Center",
+        ).add_to(fmap)
+        lats.append(spill_pos[0])
+        lons.append(spill_pos[1])
+
+    # Plot Radar Ship Targets
+    for t in targets:
+        lat = t["latitude"]
+        lon = t["longitude"]
+        lats.append(lat)
+        lons.append(lon)
+
+        if t.get("is_matched"):
+            # Cooperative target (Green)
+            tip = (f"Cooperative Vessel: {t.get('matched_vessel_name')}<br/>"
+                   f"MMSI: {t.get('matched_mmsi')}<br/>"
+                   f"Speed: {t.get('matched_speed_kn', 0):.1f} kn<br/>"
+                   f"AIS Distance: {t.get('matched_distance_m', 0):.0f} m")
+            folium.Marker(
+                [lat, lon],
+                icon=_dot(theme.GOOD, 11, glow=True),
+                tooltip=tip,
+            ).add_to(fmap)
+        else:
+            # Dark Vessel (Red if near slick, amber otherwise)
+            is_critical = t.get("risk_level") == "dark_vessel_near_slick"
+            color = theme.CRITICAL if is_critical else theme.WARN
+            tip = (f"<b>DARK VESSEL (NO AIS BROADCAST)</b><br/>"
+                   f"Est. Length: {t.get('estimated_length_m', 0):.0f} m LOA<br/>"
+                   f"Distance to Slick: {t.get('distance_to_spill_km', 0):.1f} km<br/>"
+                   f"Radar Pixels: {t.get('pixels')}")
+
+            folium.CircleMarker(
+                [lat, lon],
+                radius=7,
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.85,
+                weight=2,
+                tooltip=tip,
+            ).add_to(fmap)
+            folium.Circle(
+                [lat, lon],
+                radius=1500,
+                color=color,
+                weight=1.2,
+                dash_array="3 3",
+                fill=False,
+            ).add_to(fmap)
+
+    add_reef(fmap)
+    _fit(fmap, lats, lons, pad=0.01)
+    return fmap
+
+
 def legend(items: List[Dict[str, str]]) -> str:
     """Small HTML legend rendered under a map."""
     cells = "".join(
@@ -244,3 +347,4 @@ def legend(items: List[Dict[str, str]]) -> str:
         for i in items
     )
     return f'<div style="padding:.4rem 0 .2rem">{cells}</div>'
+

@@ -7,11 +7,17 @@ import numpy as np
 import streamlit as st
 from PIL import Image
 
+from datetime import datetime, timezone
+
+import pandas as pd
+from streamlit_folium import st_folium
+
 from poseatsea.config import CLASS_NAMES
 from poseatsea.inference import sar as sar_mod
 from poseatsea.scenario import sar_scenes
 
-from .. import charts, engine, theme
+from .. import charts, engine, maps, theme
+
 
 
 def _to_png_bytes(arr: np.ndarray) -> bytes:
@@ -97,6 +103,8 @@ def _library_view() -> None:
 
     _imagery(image, mask, alpha, class_pixels, scene.pixel_resolution_m, slicks_list)
     _legend()
+    _dark_vessels_section(scene, mask)
+
 
 
 def _vessel_crossref(scene) -> None:
@@ -161,6 +169,122 @@ def _vessel_crossref(scene) -> None:
 """,
         unsafe_allow_html=True,
     )
+
+
+def _dark_vessels_section(scene, mask: np.ndarray) -> None:
+    from poseatsea import dark_vessels
+
+    st.markdown("")
+    st.markdown("##### 🛰️ Non-Cooperative / Dark Vessel Detection")
+    st.markdown(
+        f"<div class='pos-sub' style='margin-bottom:10px'>"
+        f"Cross-referencing radar vessel contacts against active Class A/B AIS transmissions. "
+        f"Point targets detected by the radar segmenter with no active AIS broadcast within "
+        f"the satellite overpass window are flagged as non-cooperative dark vessels.</div>",
+        unsafe_allow_html=True,
+    )
+
+    ais_df = engine.scored_ais()
+    sc = engine.scenario()
+    spill_lat, spill_lon = sc["spill_position"]
+
+    # Extract radar targets from mask
+    targets = dark_vessels.extract_radar_targets_from_mask(
+        mask,
+        center_lat=scene.position[0],
+        center_lon=scene.position[1],
+        pixel_res_m=scene.pixel_resolution_m,
+    )
+
+    # Match against AIS
+    try:
+        acq_time = datetime.strptime(
+            scene.captured.replace(" UTC", ""), "%Y-%m-%d %H:%M"
+        ).replace(tzinfo=timezone.utc)
+    except Exception:
+        acq_time = None
+
+    matched_targets = dark_vessels.match_sar_ships_to_ais(
+        targets,
+        ais_df,
+        acquisition_time=acq_time,
+        spill_lat=spill_lat,
+        spill_lon=spill_lon,
+        gating_radius_m=2000.0,
+    )
+
+    dark_count = sum(1 for t in matched_targets if not t.is_matched)
+    coop_count = sum(1 for t in matched_targets if t.is_matched)
+    near_slick_count = sum(
+        1 for t in matched_targets if t.risk_level == "dark_vessel_near_slick"
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(
+            theme.metric_card("Radar Ship Targets", str(len(matched_targets)), "detected in scene"),
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            theme.metric_card("AIS Cooperative", str(coop_count), "matched to transponder", theme.GOOD if coop_count else theme.MUTED),
+            unsafe_allow_html=True,
+        )
+    with c3:
+        st.markdown(
+            theme.metric_card("Dark Vessels (No AIS)", str(dark_count), "unmatched radar return", theme.WARN if dark_count else theme.GOOD),
+            unsafe_allow_html=True,
+        )
+    with c4:
+        st.markdown(
+            theme.metric_card("Dark Vessels Near Slick", str(near_slick_count), "< 15 km to slick", theme.CRITICAL if near_slick_count else theme.GOOD),
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("")
+    mcol, tcol = st.columns([1.35, 1.0])
+    with mcol:
+        st.markdown("<b>Radar Discrepancy Footprint</b>", unsafe_allow_html=True)
+        st_folium(
+            maps.sar_dark_vessels_map(
+                scene_center=tuple(scene.position),
+                targets=[t.as_dict() for t in matched_targets],
+                scene_size_px=tuple(scene.source_size),
+                pixel_res_m=scene.pixel_resolution_m,
+                spill_pos=(spill_lat, spill_lon),
+                height=400,
+            ),
+            use_container_width=True,
+            height=400,
+            returned_objects=[],
+            key=f"dark_map_{scene.key}",
+        )
+        st.markdown(
+            maps.legend([
+                {"color": theme.GOOD, "label": "Cooperative (AIS Verified)"},
+                {"color": theme.CRITICAL, "label": "Dark Vessel (< 15 km to slick)"},
+                {"color": theme.WARN, "label": "Dark Vessel (Outer AOI)"},
+                {"color": theme.ACCENT, "label": "SAR Footprint"},
+            ]),
+            unsafe_allow_html=True,
+        )
+
+    with tcol:
+        st.markdown("<b>Detected Radar Target Registry</b>", unsafe_allow_html=True)
+        if matched_targets:
+            rows = []
+            for t in matched_targets:
+                rows.append({
+                    "Target": f"RDR-{t.target_id:02d}",
+                    "Status": "COOPERATIVE" if t.is_matched else "DARK VESSEL",
+                    "Est LOA": f"{t.estimated_length_m:.0f} m",
+                    "To Slick": f"{t.distance_to_spill_km:.1f} km" if t.distance_to_spill_km is not None else "--",
+                    "AIS Match": t.matched_vessel_name or "Silent (No AIS)",
+                })
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=360)
+        else:
+            st.info("No radar ship returns detected in this scene.")
+
 
 
 # --------------------------------------------------------------------------

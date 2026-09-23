@@ -296,3 +296,57 @@ def get_forensic_dossier(
         },
     )
 
+
+@app.get("/dark-vessels/scene/{scene_key}", tags=["dark_vessels"])
+def get_scene_dark_vessels(
+    scene_key: str,
+) -> Dict[str, Any]:
+    """Identify radar ship targets with no matching active AIS broadcasts in a SAR scene."""
+    from poseatsea import dark_vessels
+    sc = build_scenario()
+    spill_lat, spill_lon = sc["spill_position"]
+    try:
+        return dark_vessels.analyze_scene_dark_vessels(
+            scene_key=scene_key,
+            ais_df=sc["ais"],
+            spill_lat=spill_lat,
+            spill_lon=spill_lon,
+        )
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/dark-vessels/gaps", tags=["dark_vessels"])
+def get_transponder_gaps(
+    min_gap_minutes: float = Query(30.0, ge=5.0, le=1440.0),
+    min_speed_knots: float = Query(2.5, ge=0.0, le=40.0),
+    full_month: bool = Query(False, description="Scan full monthly extract instead of incident day"),
+) -> Dict[str, Any]:
+    """Scan AIS tracks for suspicious transponder blackouts and dark transits."""
+    from poseatsea import dark_vessels
+    sc = build_scenario()
+    spill_lat, spill_lon = sc["spill_position"]
+
+    if full_month:
+        from poseatsea.scenario.real_ais import clean_positions, load_raw
+        df = clean_positions(load_raw())
+    else:
+        df = sc["ais"]
+
+    gaps = dark_vessels.detect_transponder_gaps(
+        df,
+        min_gap_minutes=min_gap_minutes,
+        min_speed_knots=min_speed_knots,
+        spill_lat=spill_lat,
+        spill_lon=spill_lon,
+        hazard_radius_km=15.0,
+    )
+
+    return {
+        "total_gaps": len(gaps),
+        "high_risk_gaps": sum(1 for g in gaps if g.risk_label == "high_risk_gap"),
+        "crossed_hazard_zone": sum(1 for g in gaps if g.crossed_hazard_zone),
+        "gaps": [g.as_dict() for g in gaps],
+    }
+
+
