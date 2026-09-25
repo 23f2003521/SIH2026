@@ -201,3 +201,4 @@ def test_api_dark_vessels_endpoints(client):
     gaps_data = resp_gaps.json()
     assert "total_gaps" in gaps_data
     assert "gaps" in gaps_data
+

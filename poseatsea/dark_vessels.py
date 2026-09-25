@@ -496,3 +496,4 @@ def analyze_scene_dark_vessels(
         "high_risk_dark_vessels": sum(1 for t in dark_targets if t.risk_level == "dark_vessel_near_slick"),
         "targets": [t.as_dict() for t in matched_targets],
     }
+
