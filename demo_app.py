@@ -541,16 +541,34 @@ with tab5:
 
         c_map, c_info = st.columns([2.2, 1])
         with c_map:
-            st.markdown('<div class="section-label">Layer-wise Exposure Map (Use top-right LayerControl to toggle components)</div>', unsafe_allow_html=True)
-            cm = maps.coastal_vulnerability_map(height=480)
-            st_folium(cm, width=None, height=480, returned_objects=[], key="demo_cv_map")
-            st.markdown(maps.legend([
-                {"color": "#3fb950", "label": "Low (≤ 2.0)"},
-                {"color": "#d29922", "label": "Moderate (2.0 - 3.0)"},
-                {"color": "#f85149", "label": "High (3.0 - 4.0)"},
-                {"color": "#bd561d", "label": "Very High (> 4.0)"},
-            ]), unsafe_allow_html=True)
-            st.markdown(maps.component_legend(), unsafe_allow_html=True)
+            c_ttl, c_lyr = st.columns([1, 1.45])
+            with c_ttl:
+                st.markdown('<div class="section-label">Coastal Exposure Map</div>', unsafe_allow_html=True)
+            with c_lyr:
+                demo_layer = st.selectbox(
+                    "Layer",
+                    [
+                        "Overall Exposure",
+                        "Natural Habitat Protection (R_hab)",
+                        "Wave Exposure (R_wave)",
+                        "Wind Fetch Exposure (R_wind)",
+                        "Coastal Relief (R_relief)",
+                        "Storm Surge Potential (R_surge)",
+                    ],
+                    key="demo_cv_layer_sel",
+                    label_visibility="collapsed",
+                )
+            cm = maps.coastal_vulnerability_map(height=480, active_layer=demo_layer)
+            st_folium(cm, width=None, height=480, returned_objects=[], key=f"demo_cv_map_{demo_layer}")
+            if demo_layer == "Overall Exposure":
+                st.markdown(maps.legend([
+                    {"color": "#3fb950", "label": "Low (≤ 2.0)"},
+                    {"color": "#d29922", "label": "Moderate (2.0 - 3.0)"},
+                    {"color": "#f85149", "label": "High (3.0 - 4.0)"},
+                    {"color": "#bd561d", "label": "Very High (> 4.0)"},
+                ]), unsafe_allow_html=True)
+            else:
+                st.markdown(maps.component_legend(), unsafe_allow_html=True)
         with c_info:
             st.markdown('<div class="section-label">Biophysical Components</div>', unsafe_allow_html=True)
             st.markdown(f"""<div class="kpi-card" style="line-height:1.7;font-size:.85rem">

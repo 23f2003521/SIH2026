@@ -83,40 +83,56 @@ def render() -> None:
     left, right = st.columns([1.65, 1])
 
     with left:
-        st.markdown("##### Interactive coastal exposure map")
+        c_title, c_sel = st.columns([1, 1.45])
+        with c_title:
+            st.markdown("##### Coastal exposure map")
+        with c_sel:
+            THEMATIC_LAYERS = [
+                "Overall Exposure",
+                "Natural Habitat Protection (R_hab)",
+                "Wave Exposure (R_wave)",
+                "Wind Fetch Exposure (R_wind)",
+                "Coastal Relief (R_relief)",
+                "Storm Surge Potential (R_surge)",
+            ]
+            active_layer = st.selectbox(
+                "Map Layer",
+                THEMATIC_LAYERS,
+                index=0,
+                label_visibility="collapsed",
+                key="coastal_active_layer_sel",
+            )
+
         st_folium(
-            maps.coastal_vulnerability_map(height=540),
+            maps.coastal_vulnerability_map(height=520, active_layer=active_layer),
             use_container_width=True,
-            height=540,
+            height=520,
             returned_objects=[],
-            key="coastal_full_map",
-        )
-        st.caption(
-            "Layer control in top-right corner allows switching between Overall Exposure "
-            "and individual biophysical components (Habitats, Waves, Winds, Relief, Surge)."
+            key=f"coastal_map_{active_layer}",
         )
 
-        st.markdown(
-            f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:8px'>"
-            f"OVERALL EXPOSURE TIERS</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            maps.legend([
-                {"color": "#3fb950", "label": "Low (≤ 2.0)"},
-                {"color": "#d29922", "label": "Moderate (2.0 - 3.0)"},
-                {"color": "#f85149", "label": "High (3.0 - 4.0)"},
-                {"color": "#bd561d", "label": "Very High (> 4.0)"},
-            ]),
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:6px'>"
-            f"BIOPHYSICAL COMPONENT RANKS (1-5)</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(maps.component_legend(), unsafe_allow_html=True)
+        if active_layer == "Overall Exposure":
+            st.markdown(
+                f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:8px'>"
+                f"OVERALL EXPOSURE TIERS</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                maps.legend([
+                    {"color": "#3fb950", "label": "Low (≤ 2.0)"},
+                    {"color": "#d29922", "label": "Moderate (2.0 - 3.0)"},
+                    {"color": "#f85149", "label": "High (3.0 - 4.0)"},
+                    {"color": "#bd561d", "label": "Very High (> 4.0)"},
+                ]),
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:8px'>"
+                f"{active_layer.upper()} (RANKS 1-5)</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(maps.component_legend(), unsafe_allow_html=True)
 
         theme.provenance(
             "InVEST Coastal Vulnerability model (Sharp et al. / Arkema et al. 2013). "
