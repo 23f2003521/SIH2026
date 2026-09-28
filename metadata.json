@@ -1,0 +1,322 @@
+{
+  "coastal_vulnerability": {
+    "status": "completed",
+
+    "aoi": {
+      "path": "assets/coastal_vulnerability/mauritius_aoi_final.gpkg",
+      "layer": "aoi",
+      "geometry": "Polygon",
+      "current_geometry_reported_by_ogr": "Polygon",
+      "feature_count": 1,
+      "crs": {
+        "epsg": 32740,
+        "name": "WGS 84 / UTM zone 40S",
+        "units": "metres"
+      },
+      "geographic_bounds_wgs84": {
+        "west": 57.62,
+        "east": 57.90,
+        "south": -20.62,
+        "north": -20.30
+      },
+      "projected_extent": {
+        "west": 564598.493123,
+        "east": 593968.019530,
+        "south": 7719647.684502,
+        "north": 7755198.613879
+      },
+      "purpose": "InVEST Coastal Vulnerability analysis AOI"
+    },
+
+    "bathymetry": {
+      "source": "GEBCO 2026",
+      "original_path": "assets/gebco/gebco_2026_n-19.75_s-21.25_w57.0_e58.5.nc",
+      "processed_path": "assets/derived/gebco_bathymetry.tif",
+      "format": "GeoTIFF",
+      "source_variable": "elevation",
+      "source_crs": {
+        "epsg": 4326,
+        "name": "WGS 84"
+      },
+      "source_resolution_arcseconds": 15,
+      "source_resolution_degrees": 0.004166666666667,
+      "source_extent_wgs84": {
+        "west": 57.0,
+        "east": 58.5,
+        "south": -21.25,
+        "north": -19.75
+      },
+      "units": "metres",
+      "vertical_reference": "relative to mean sea level",
+      "negative_values": "bathymetric depths below sea level",
+      "nodata": -32767,
+      "statistics_m": {
+        "minimum": -5047.0,
+        "maximum": 757.0,
+        "mean": -3151.068,
+        "stddev": 1636.489
+      },
+      "purpose": "InVEST Coastal Vulnerability bathymetry and shelf-contour derivation"
+    },
+
+    "dem": {
+      "source": "Copernicus DEM GLO-30",
+      "product_type": "Digital Surface Model (DSM)",
+      "resolution_m": 30,
+      "tile": "Copernicus_DSM_10_S21_00_E057_00",
+      "path": "assets/dem_glo30/DEM1_SAR_DGE_30_20110518T014310_20121016T014335_ADS_000000_tQoD_9f0619ea/Copernicus_DSM_10_S21_00_E057_00/DEM/Copernicus_DSM_10_S21_00_E057_00_DEM.tif",
+      "format": "GeoTIFF",
+      "crs": {
+        "epsg": 4326,
+        "name": "WGS 84"
+      },
+      "extent_wgs84": {
+        "west": 56.9998611,
+        "east": 58.0001389,
+        "south": -21.0001389,
+        "north": -19.9998611
+      },
+      "raster_size": {
+        "width": 3601,
+        "height": 3601
+      },
+      "pixel_size_degrees": 0.000277777777778,
+      "approx_pixel_size_m": 30,
+      "data_type": "Float32",
+      "elevation_statistics_m": {
+        "minimum": -4.5,
+        "maximum": 818.53564453125,
+        "mean": 34.697137850833,
+        "stddev": 107.3322146125
+      },
+      "valid_percent": 100,
+      "purpose": "InVEST Coastal Vulnerability DEM input",
+      "limitation": "DSM rather than bare-earth DEM; vegetation/buildings may affect elevations"
+    },
+
+    "landmass": {
+      "status": "available",
+      "path": "assets/landmass/mauritius_land.gpkg",
+      "layer": "mauritius_land",
+      "geometry": "Polygon",
+      "feature_count": 1,
+      "crs": {
+        "epsg": 32740,
+        "name": "WGS 84 / UTM zone 40S",
+        "units": "metres"
+      },
+      "extent_projected": {
+        "west": 541709.173803,
+        "east": 583123.554018,
+        "south": 7731186.413462,
+        "north": 7777375.310477
+      },
+      "purpose": "InVEST landmass and fetch calculations"
+    },
+
+    "shelf_contour": {
+      "status": "available",
+      "path": "assets/coastal_vulnerability/shelf_contour_200m.gpkg",
+      "layer": "shelf_contour_200m",
+      "geometry": "LineString",
+      "feature_count": 7,
+      "crs": {
+        "epsg": 32740,
+        "name": "WGS 84 / UTM zone 40S",
+        "units": "metres"
+      },
+      "target_depth_m": -200,
+      "purpose": "InVEST continental shelf contour input"
+    },
+
+    "era5_forcing": {
+      "status": "available",
+      "period_utc": {
+        "start": "2020-07-01T00:00:00Z",
+        "end": "2020-08-21T23:00:00Z"
+      },
+      "time_steps": 1248,
+      "wind": {
+        "path": "assets/significant_height_of_combined_wind_waves_swell/reanalysis-era5-single-levels-timeseries-sfcm_puf_m6.nc",
+        "variables": [
+          "u10",
+          "v10"
+        ],
+        "units": "m s-1",
+        "grid": {
+          "latitude": [
+            -20.75,
+            -20.5,
+            -20.25
+          ],
+          "longitude": [
+            57.5,
+            57.75,
+            58.0
+          ]
+        }
+      },
+      "wave": {
+        "path": "assets/significant_height_of_combined_wind_waves_swell/reanalysis-era5-single-levels-timeseries-wavx0_vb0k1.nc",
+        "variables": [
+          "mwd",
+          "mwp",
+          "swh"
+        ],
+        "units": {
+          "mwd": "degree true",
+          "mwp": "s",
+          "swh": "m"
+        },
+        "grid": {
+          "latitude": [
+            -20.5
+          ],
+          "longitude": [
+            57.5,
+            58.0
+          ]
+        }
+      },
+      "purpose": "ERA5 meteorological and wave forcing for deriving InVEST WWIII-compatible directional statistics",
+      "limitation": "ERA5-derived forcing is being converted to the InVEST WWIII input schema; it is not native WaveWatchIII data"
+    },
+
+    "wwiii_era5_conversion": {
+      "status": "generated",
+      "script_path": "scripts/build_invest_wwiii_from_era5.py",
+      "output_path": "assets/coastal_vulnerability/wwiii_era5_mauritius.gpkg",
+      "geometry": "Point",
+      "crs": {
+        "epsg": 4326,
+        "name": "WGS 84"
+      },
+      "required_directional_sectors": [
+        0,
+        22,
+        45,
+        67,
+        90,
+        112,
+        135,
+        157,
+        180,
+        202,
+        225,
+        247,
+        270,
+        292,
+        315,
+        337
+      ],
+      "required_field_groups": [
+        "REI_PCT",
+        "REI_V",
+        "WavPPCT",
+        "WavP_",
+        "V10PCT_"
+      ],
+      "required_field_count": 80,
+      "wind_speed_formula": "sqrt(u10^2 + v10^2)",
+      "wind_direction_formula": "(270.0 - degrees(arctan2(v10, u10))) % 360.0",
+      "wave_power_approximation": "P ≈ 0.49 * swh^2 * mwp kW/m",
+      "wave_power_limitation": "Uses ERA5 mean wave period (mwp) as the period term; this is an approximation rather than a directly supplied energy period",
+      "thresholding": "Highest 10% (90th percentile) across record binned into 16 equiangular 22.5° sectors"
+    },
+
+    "model_parameters": {
+      "model_resolution_m": 250.0,
+      "model_resolution_justification": "Optimal coastal segment fidelity (~140 points) along the 35 km southeast Mauritius shoreline; consistent with 30 m Copernicus DEM and 15 arcsecond GEBCO bathymetry",
+      "max_fetch_distance_m": 12000.0,
+      "max_fetch_justification": "Sufficient to cover local wind fetch across the southeastern lagoon and barrier reef; rays open to the east transition to oceanic wave power from the WWIII layer",
+      "dem_averaging_radius_m": 2000.0,
+      "dem_averaging_justification": "Adequately smooths Copernicus DSM canopy and infrastructure surface artifacts while capturing the low-lying coastal hinterland elevation relevant to storm surge runup"
+    },
+
+    "required_inputs": {
+      "aoi_vector_path": {
+        "status": "available",
+        "path": "assets/coastal_vulnerability/mauritius_aoi_final.gpkg",
+        "layer": "aoi"
+      },
+      "bathymetry_raster_path": {
+        "status": "available",
+        "path": "assets/derived/gebco_bathymetry.tif"
+      },
+      "dem_path": {
+        "status": "available",
+        "path": "assets/dem_glo30/DEM1_SAR_DGE_30_20110518T014310_20121016T014335_ADS_000000_tQoD_9f0619ea/Copernicus_DSM_10_S21_00_E057_00/DEM/Copernicus_DSM_10_S21_00_E057_00_DEM.tif"
+      },
+      "landmass_vector_path": {
+        "status": "available",
+        "path": "assets/landmass/mauritius_land.gpkg",
+        "layer": "mauritius_land"
+      },
+      "wwiii_vector_path": {
+        "status": "available",
+        "path": "assets/coastal_vulnerability/wwiii_era5_mauritius.gpkg",
+        "script": "scripts/build_invest_wwiii_from_era5.py",
+        "note": "Generated with all 80 required InVEST directional fields, deep-water wave power formula, and meteorological wind direction formulas"
+      },
+      "shelf_contour_vector_path": {
+        "status": "available",
+        "path": "assets/coastal_vulnerability/shelf_contour_200m.gpkg",
+        "layer": "shelf_contour_200m",
+        "target_depth_m": -200
+      },
+      "habitat_table_path": {
+        "status": "available",
+        "path": "assets/coastal_vulnerability/natural_habitats.csv",
+        "script": "scripts/prepare_habitats.py",
+        "habitats": [
+          {
+            "id": "coral_reef",
+            "path": "assets/habitats/coral_reef_mauritius.gpkg",
+            "rank": 1,
+            "protection_distance_m": 2000,
+            "literature_source": "Arkema et al. (2013); InVEST CV User Guide Table 5; Ferrario et al. (2014)"
+          },
+          {
+            "id": "mangrove",
+            "path": "assets/habitats/mangrove_mauritius.gpkg",
+            "rank": 1,
+            "protection_distance_m": 1000,
+            "literature_source": "Arkema et al. (2013); InVEST CV User Guide Table 5; Quartel et al. (2007)"
+          }
+        ]
+      }
+    },
+
+    "invest_execution": {
+      "script_path": "scripts/run_coastal_vulnerability.py",
+      "workspace_dir": "assets/coastal_vulnerability/invest_workspace",
+      "export_geojson": "assets/coastal_vulnerability/coastal_exposure.geojson",
+      "status": "completed"
+    },
+
+    "dashboard_integration": {
+      "core_module": "poseatsea/coastal.py",
+      "map_layer": "ui/maps.py",
+      "overview_view": "ui/views/overview.py",
+      "coastal_view": "ui/views/coastal_view.py",
+      "standalone_demo": "demo_app.py",
+      "status": "fully_integrated_with_dedicated_view"
+    },
+
+    "processing_plan": [
+      "Validate final 2D AOI geometry",
+      "Verify processed GEBCO GeoTIFF metadata and coverage",
+      "Derive and validate -200 m shelf contour from GEBCO",
+      "Acquire and validate landmass polygon with sufficient fetch coverage",
+      "Prepare authoritative habitat layers and habitat table",
+      "Convert ERA5 wind/wave data to InVEST 16-sector WWIII-format vector",
+      "Validate the 80 required WWIII fields",
+      "Prepare/reproject DEM and bathymetry consistently as required by InVEST",
+      "Select and document model resolution, maximum fetch distance, and DEM averaging radius",
+      "Validate all InVEST arguments",
+      "Run InVEST Coastal Vulnerability",
+      "Validate InVEST outputs",
+      "Integrate resulting exposure/vulnerability layers into the dashboard"
+    ]
+  }
+}

@@ -59,11 +59,54 @@ def _fit(fmap: folium.Map, lats, lons, pad: float = 0.01) -> None:
                      [max(lats) + pad, max(lons) + pad]])
 
 
-def add_reef(fmap: folium.Map, label: str = "Pointe d'Esny reef") -> None:
-    """The grounding site, with a 5 km hazard ring."""
-    folium.Circle(REEF, radius=5000, color=theme.CRITICAL, weight=1.4,
-                  fill=True, fill_color=theme.CRITICAL, fill_opacity=0.07,
-                  dash_array="6 6", tooltip=f"{label} — 5 km hazard radius").add_to(fmap)
+RANK_COLORS = {
+    1: "#2ea043",  # Low hazard / High protection (Green)
+    2: "#3fb950",  # Low
+    3: "#d29922",  # Moderate (Amber)
+    4: "#f85149",  # High (Red)
+    5: "#bd561d",  # Very High / Unprotected (Crimson)
+}
+
+
+def get_rank_color(val: float) -> str:
+    """Map numeric rank 1-5 to a distinct graduated hex color."""
+    r = int(round(val))
+    return RANK_COLORS.get(max(1, min(5, r)), "#d29922")
+
+
+def add_coastal_vulnerability(fmap: folium.Map, show_hazard_ring: bool = False) -> None:
+    """
+    Renders InVEST Coastal Vulnerability shore segments along the Mauritius coastline.
+    Replaces the static 5 km reef hazard ring with scientifically computed exposure tiers.
+    """
+    from poseatsea import coastal
+
+    exposure_df = coastal.load_exposure_points()
+    if not exposure_df.empty:
+        fg = folium.FeatureGroup(name="Coastal Vulnerability (InVEST)", show=True)
+        for row in exposure_df.itertuples():
+            folium.CircleMarker(
+                [row.latitude, row.longitude],
+                radius=4.5,
+                color=row.color,
+                fill=True,
+                fill_color=row.color,
+                fill_opacity=0.9,
+                weight=1,
+                tooltip=(
+                    f"Shore Segment #{row.shore_id}: Exposure Index {row.exposure_index:.2f} ({row.exposure_tier})<br>"
+                    f"Wave Exposure: {row.r_wave:.0f} · Wind: {row.r_wind:.0f}<br>"
+                    f"Habitat Protection: {row.r_hab:.0f} · Relief: {row.r_relief:.0f}"
+                ),
+            ).add_to(fg)
+        fg.add_to(fmap)
+    else:
+        # If InVEST outputs are missing, fallback to the 5 km hazard radius ring
+        label = "Pointe d'Esny reef"
+        folium.Circle(REEF, radius=5000, color=theme.CRITICAL, weight=1.4,
+                      fill=True, fill_color=theme.CRITICAL, fill_opacity=0.07,
+                      dash_array="6 6", tooltip=f"{label} — 5 km hazard radius (fallback)").add_to(fmap)
+
     folium.Marker(
         REEF,
         icon=folium.DivIcon(
@@ -71,8 +114,192 @@ def add_reef(fmap: folium.Map, label: str = "Pointe d'Esny reef") -> None:
                  f'border:2.5px solid {theme.CRITICAL};box-shadow:0 0 10px {theme.CRITICAL};'
                  f'background:{theme.CRITICAL}33"></div>',
             icon_size=(20, 20), icon_anchor=(10, 10)),
-        tooltip=label,
+        tooltip="MV Wakashio Grounding Site (Pointe d'Esny)",
     ).add_to(fmap)
+
+
+def add_reef(fmap: folium.Map, label: str = "Pointe d'Esny reef") -> None:
+    """The grounding site, with computed coastal vulnerability overlay (fallback ring only if missing)."""
+    add_coastal_vulnerability(fmap, show_hazard_ring=False)
+
+
+def coastal_vulnerability_map(height: int = 540) -> folium.Map:
+    """
+    Dedicated layer-wise InVEST Coastal Vulnerability map.
+    Provides 6 client-side toggleable FeatureGroups via folium.LayerControl:
+      1. Overall Exposure (exposure_index, default visible)
+      2. Natural Habitat Protection (R_hab)
+      3. Wave Exposure (R_wave)
+      4. Wind Fetch Exposure (R_wind)
+      5. Coastal Relief (R_relief)
+      6. Storm Surge (R_surge)
+    """
+    from poseatsea import coastal
+
+    exposure_df = coastal.load_exposure_points()
+    center = [float(exposure_df["latitude"].mean()), float(exposure_df["longitude"].mean())] if not exposure_df.empty else list(REEF)
+    fmap = base_map(center, zoom=11, height=height)
+
+    if exposure_df.empty:
+        add_coastal_vulnerability(fmap, show_hazard_ring=True)
+        return fmap
+
+    # 1. Overall Exposure (Default visible)
+    fg_overall = folium.FeatureGroup(name="Overall Exposure (InVEST Index)", show=True)
+    for row in exposure_df.itertuples():
+        folium.CircleMarker(
+            [row.latitude, row.longitude],
+            radius=5,
+            color=row.color,
+            fill=True,
+            fill_color=row.color,
+            fill_opacity=0.9,
+            weight=1,
+            tooltip=(
+                f"<b>Shore Segment #{row.shore_id}</b><br>"
+                f"<b>Overall Exposure Index:</b> {row.exposure_index:.2f} ({row.exposure_tier})<br>"
+                f"<hr style='margin:3px 0;border:0;border-top:1px solid #444'>"
+                f"Natural Habitats (R_hab): {row.r_hab:.0f} / 5<br>"
+                f"Wave Exposure (R_wave): {row.r_wave:.0f} / 5<br>"
+                f"Wind Fetch (R_wind): {row.r_wind:.0f} / 5<br>"
+                f"Coastal Relief (R_relief): {row.r_relief:.0f} / 5<br>"
+                f"Storm Surge (R_surge): {row.r_surge:.0f} / 5"
+            ),
+            popup=folium.Popup(
+                f"<div style='font-family:sans-serif;font-size:12px;min-width:180px'>"
+                f"<b>Segment #{row.shore_id} Assessment</b><br>"
+                f"Exposure Index: <b>{row.exposure_index:.2f} ({row.exposure_tier})</b><br><br>"
+                f"<b>Biophysical Ranks (1-5):</b><br>"
+                f"• Habitats (R_hab): {row.r_hab:.0f}<br>"
+                f"• Wave (R_wave): {row.r_wave:.0f}<br>"
+                f"• Wind (R_wind): {row.r_wind:.0f}<br>"
+                f"• Relief (R_relief): {row.r_relief:.0f}<br>"
+                f"• Surge (R_surge): {row.r_surge:.0f}"
+                f"</div>",
+                max_width=250,
+            ),
+        ).add_to(fg_overall)
+    fg_overall.add_to(fmap)
+
+    # 2. Natural Habitat Protection (R_hab)
+    fg_hab = folium.FeatureGroup(name="Natural Habitat Protection (R_hab)", show=False)
+    for row in exposure_df.itertuples():
+        c = get_rank_color(row.r_hab)
+        desc = "Coral reef / mangrove protection" if row.r_hab <= 2 else ("Partial protection" if row.r_hab <= 3 else "No protective habitat buffer")
+        folium.CircleMarker(
+            [row.latitude, row.longitude],
+            radius=5,
+            color=c,
+            fill=True,
+            fill_color=c,
+            fill_opacity=0.9,
+            weight=1,
+            tooltip=(
+                f"<b>Segment #{row.shore_id}</b><br>"
+                f"<b>Natural Habitat (R_hab): {row.r_hab:.0f} / 5</b> ({desc})<br>"
+                f"Overall Exposure: {row.exposure_index:.2f} ({row.exposure_tier})"
+            ),
+        ).add_to(fg_hab)
+    fg_hab.add_to(fmap)
+
+    # 3. Wave Exposure (R_wave)
+    fg_wave = folium.FeatureGroup(name="Wave Exposure (R_wave)", show=False)
+    for row in exposure_df.itertuples():
+        c = get_rank_color(row.r_wave)
+        folium.CircleMarker(
+            [row.latitude, row.longitude],
+            radius=5,
+            color=c,
+            fill=True,
+            fill_color=c,
+            fill_opacity=0.9,
+            weight=1,
+            tooltip=(
+                f"<b>Segment #{row.shore_id}</b><br>"
+                f"<b>Wave Exposure (R_wave): {row.r_wave:.0f} / 5</b><br>"
+                f"Overall Exposure: {row.exposure_index:.2f} ({row.exposure_tier})"
+            ),
+        ).add_to(fg_wave)
+    fg_wave.add_to(fmap)
+
+    # 4. Wind Fetch Exposure (R_wind)
+    fg_wind = folium.FeatureGroup(name="Wind Fetch Exposure (R_wind)", show=False)
+    for row in exposure_df.itertuples():
+        c = get_rank_color(row.r_wind)
+        folium.CircleMarker(
+            [row.latitude, row.longitude],
+            radius=5,
+            color=c,
+            fill=True,
+            fill_color=c,
+            fill_opacity=0.9,
+            weight=1,
+            tooltip=(
+                f"<b>Segment #{row.shore_id}</b><br>"
+                f"<b>Wind Fetch (R_wind): {row.r_wind:.0f} / 5</b><br>"
+                f"Overall Exposure: {row.exposure_index:.2f} ({row.exposure_tier})"
+            ),
+        ).add_to(fg_wind)
+    fg_wind.add_to(fmap)
+
+    # 5. Coastal Relief (R_relief)
+    fg_relief = folium.FeatureGroup(name="Coastal Relief (R_relief)", show=False)
+    for row in exposure_df.itertuples():
+        c = get_rank_color(row.r_relief)
+        desc = "High elevation / cliff" if row.r_relief <= 2 else ("Moderate elevation" if row.r_relief <= 3 else "Low-lying coastal plain")
+        folium.CircleMarker(
+            [row.latitude, row.longitude],
+            radius=5,
+            color=c,
+            fill=True,
+            fill_color=c,
+            fill_opacity=0.9,
+            weight=1,
+            tooltip=(
+                f"<b>Segment #{row.shore_id}</b><br>"
+                f"<b>Coastal Relief (R_relief): {row.r_relief:.0f} / 5</b> ({desc})<br>"
+                f"Overall Exposure: {row.exposure_index:.2f} ({row.exposure_tier})"
+            ),
+        ).add_to(fg_relief)
+    fg_relief.add_to(fmap)
+
+    # 6. Storm Surge (R_surge)
+    fg_surge = folium.FeatureGroup(name="Storm Surge Potential (R_surge)", show=False)
+    for row in exposure_df.itertuples():
+        c = get_rank_color(row.r_surge)
+        desc = "Steep bathymetry / low surge" if row.r_surge <= 2 else "Shallow shelf / high surge potential"
+        folium.CircleMarker(
+            [row.latitude, row.longitude],
+            radius=5,
+            color=c,
+            fill=True,
+            fill_color=c,
+            fill_opacity=0.9,
+            weight=1,
+            tooltip=(
+                f"<b>Segment #{row.shore_id}</b><br>"
+                f"<b>Storm Surge (R_surge): {row.r_surge:.0f} / 5</b> ({desc})<br>"
+                f"Overall Exposure: {row.exposure_index:.2f} ({row.exposure_tier})"
+            ),
+        ).add_to(fg_surge)
+    fg_surge.add_to(fmap)
+
+    # Grounding Site Reference Marker
+    folium.Marker(
+        REEF,
+        icon=folium.DivIcon(
+            html=f'<div style="width:22px;height:22px;border-radius:50%;'
+                 f'border:2.5px solid {theme.CRITICAL};box-shadow:0 0 10px {theme.CRITICAL};'
+                 f'background:{theme.CRITICAL}33;display:flex;align-items:center;justify-content:center;'
+                 f'color:{theme.CRITICAL};font-size:11px;font-weight:bold">W</div>',
+            icon_size=(22, 22), icon_anchor=(11, 11)),
+        tooltip="MV Wakashio Grounding Site (Pointe d'Esny)",
+    ).add_to(fmap)
+
+    folium.LayerControl(position="topright", collapsed=False).add_to(fmap)
+    _fit(fmap, list(exposure_df["latitude"]), list(exposure_df["longitude"]))
+    return fmap
+
 
 
 def _dot(color: str, size: int, glow: bool = False) -> folium.DivIcon:
@@ -139,6 +366,7 @@ def traffic_map(scored: pd.DataFrame, spill: Optional[Dict[str, float]] = None,
             tooltip="Observed slick",
         ).add_to(fmap)
 
+    folium.LayerControl(position="topright", collapsed=True).add_to(fmap)
     _fit(fmap, list(scored["latitude"]), list(scored["longitude"]))
     return fmap
 
@@ -198,6 +426,7 @@ def trajectory_map(track: pd.DataFrame, history: pd.DataFrame,
                   tooltip="Prediction vs actual").add_to(fmap)
 
     add_reef(fmap)
+    folium.LayerControl(position="topright", collapsed=True).add_to(fmap)
     _fit(fmap, lats, lons, pad=0.004)
     return fmap
 
@@ -230,6 +459,7 @@ def deviation_map(track: pd.DataFrame, trace: pd.DataFrame, height: int = 520) -
                   tooltip=f"Worst deviation {worst['deviation_km']:.3f} km").add_to(fmap)
 
     add_reef(fmap)
+    folium.LayerControl(position="topright", collapsed=True).add_to(fmap)
     _fit(fmap, list(track["latitude"]), list(track["longitude"]))
     return fmap
 
@@ -244,3 +474,16 @@ def legend(items: List[Dict[str, str]]) -> str:
         for i in items
     )
     return f'<div style="padding:.4rem 0 .2rem">{cells}</div>'
+
+
+def component_legend() -> str:
+    """Legend for relative 1-5 component exposure/protection ranks."""
+    items = [
+        {"color": "#2ea043", "label": "Rank 1 (Low exposure / High protection)"},
+        {"color": "#3fb950", "label": "Rank 2"},
+        {"color": "#d29922", "label": "Rank 3 (Moderate)"},
+        {"color": "#f85149", "label": "Rank 4"},
+        {"color": "#bd561d", "label": "Rank 5 (High exposure / Unprotected)"},
+    ]
+    return legend(items)
+

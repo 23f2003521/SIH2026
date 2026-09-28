@@ -62,6 +62,35 @@ VESSELS = {
 }
 STATUS_DOT = {"GROUNDED":"#f85149","ANOMALY":"#d29922","DEVIATING":"#d29922","NORMAL":"#3fb950"}
 
+def add_coastal_layer(folium_map):
+    """Overlay InVEST Coastal Vulnerability shore exposure points if available. Returns True if rendered."""
+    try:
+        from poseatsea import coastal
+        pts = coastal.load_exposure_points()
+        if not pts.empty:
+            fg = folium.FeatureGroup(name="Coastal Vulnerability (InVEST)", show=True)
+            for row in pts.itertuples():
+                folium.CircleMarker(
+                    [row.latitude, row.longitude],
+                    radius=4,
+                    color=row.color,
+                    fill=True,
+                    fill_color=row.color,
+                    fill_opacity=0.85,
+                    weight=1,
+                    tooltip=(
+                        f"Shore Segment #{row.shore_id}: {row.exposure_index:.2f} ({row.exposure_tier})<br>"
+                        f"Wave: {row.r_wave:.0f} · Wind: {row.r_wind:.0f}<br>"
+                        f"Habitats: {row.r_hab:.0f} · Relief: {row.r_relief:.0f}"
+                    ),
+                ).add_to(fg)
+            fg.add_to(folium_map)
+            folium.LayerControl(position="topright", collapsed=True).add_to(folium_map)
+            return True
+    except Exception:
+        pass
+    return False
+
 def hav(lat1,lon1,lat2,lon2):
     R=6371; dl=math.radians(lat2-lat1); dg=math.radians(lon2-lon1)
     a=math.sin(dl/2)**2+math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dg/2)**2
@@ -182,11 +211,12 @@ with st.sidebar:
     st.caption("AIS Feed: Live | SAR: Online (6h delay)")
 
 # ── Tabs ───────────────────────────────────────────────────
-tab1,tab2,tab3,tab4=st.tabs([
+tab1,tab2,tab3,tab4,tab5=st.tabs([
     "Route Deviation (LSTM)",
     "AIS Anomaly Detection",
     "SAR Oil Spill Segmenter",
     "Attribution Pipeline",
+    "Coastal Vulnerability",
 ])
 
 # ══════════════════════════════════════════════════════════
@@ -253,9 +283,10 @@ with tab1:
             pl2=float(an["lat"])+np.random.normal(0,.003); pg2=float(an["lon"])+np.random.normal(0,.003)
             folium.Marker([pl2,pg2],icon=folium.DivIcon(html='<div style="background:#388bfd;color:white;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;border:2px solid white;box-shadow:0 0 6px #388bfd">P</div>',icon_size=(18,18),icon_anchor=(9,9)),tooltip=f"LSTM Predicted | dev:{ld:.3f}km").add_to(fm)
             folium.Marker([float(an["lat"]),float(an["lon"])],icon=folium.DivIcon(html='<div style="background:#d29922;color:white;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;border:2px solid white">A</div>',icon_size=(18,18),icon_anchor=(9,9)),tooltip="Actual Next Position").add_to(fm)
-            folium.PolyLine([[pl2,pg2],[float(an["lat"]),float(an["lon"])]],color="#d29922",weight=1.5,dash_array="4 4",tooltip=f"Deviation: {ld:.3f}km").add_to(fm)
+        has_coastal = add_coastal_layer(fm)
         folium.Marker(REEF,icon=folium.DivIcon(html='<div style="font-size:18px">@</div>',icon_size=(22,22),icon_anchor=(11,11)),tooltip="Pointe d Esny Reef Hazard").add_to(fm)
-        folium.Circle(REEF,radius=5000,color="#f85149",fill=True,fill_color="#f85149",fill_opacity=.08,weight=1.5,dash_array="5 5").add_to(fm)
+        if not has_coastal:
+            folium.Circle(REEF,radius=5000,color="#f85149",fill=True,fill_color="#f85149",fill_opacity=.08,weight=1.5,dash_array="5 5").add_to(fm)
         leg='<div style="position:fixed;bottom:14px;left:14px;z-index:9999;background:#161b22cc;border:1px solid #30363d;border-radius:8px;padding:10px 14px;font-size:12px;color:#e6edf3"><b style="color:#8b949e;font-size:11px">LEGEND</b><br>-- Planned Route<br>S = Current Vessel<br><span style="color:#388bfd">P</span> = LSTM Predicted<br><span style="color:#d29922">A</span> = Actual Next<br>@ = Reef Hazard Zone</div>'
         fm.get_root().html.add_child(folium.Element(leg))
         st_folium(fm,width=None,height=480,returned_objects=[])
@@ -355,8 +386,10 @@ with tab2:
             folium.CircleMarker([row["lat"],row["lon"]],radius=r,color=clr,fill=True,fill_color=clr,fill_opacity=.7,weight=1,tooltip=f'{"ANOMALY" if row["anom"] else "Normal"} score:{row["score"]:.5f} dev:{row["dev"]:.2f}km').add_to(m2)
         lp2=df2v.iloc[-1]
         folium.Marker([lp2["lat"],lp2["lon"]],icon=folium.DivIcon(html=f'<div style="background:{"#f85149" if is_an else "#3fb950"};border-radius:50%;width:24px;height:24px;border:2px solid white;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 0 12px {"#f85149" if is_an else "#3fb950"}">S</div>',icon_size=(24,24),icon_anchor=(12,12)),tooltip=f"{vi2['name']} | {'ANOMALY' if is_an else 'Normal'}").add_to(m2)
+        has_coastal = add_coastal_layer(m2)
         folium.Marker(REEF,icon=folium.DivIcon(html='<div style="font-size:16px">@</div>',icon_size=(20,20),icon_anchor=(10,10)),tooltip="Reef Hazard").add_to(m2)
-        folium.Circle(REEF,radius=5000,color="#f85149",fill=True,fill_color="#f85149",fill_opacity=.06,weight=1,dash_array="5 5").add_to(m2)
+        if not has_coastal:
+            folium.Circle(REEF,radius=5000,color="#f85149",fill=True,fill_color="#f85149",fill_opacity=.06,weight=1,dash_array="5 5").add_to(m2)
         st_folium(m2,width=None,height=360,returned_objects=[])
 
     st.markdown("---")
@@ -481,9 +514,66 @@ with tab4:
         st.markdown('<div class="section-label" style="margin-top:14px">Attribution Map</div>', unsafe_allow_html=True)
         m4=folium.Map(location=[-20.44,57.75],zoom_start=12,tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", attr="Esri")
         folium.Circle([-20.452,57.736],radius=2800,color="#00d2d2",fill=True,fill_color="#00d2d2",fill_opacity=.3,weight=2,tooltip="SAR Confirmed Oil Spill — 4.27 km2").add_to(m4)
+        has_coastal = add_coastal_layer(m4)
         folium.Marker(REEF,icon=folium.DivIcon(html='<div style="background:#f85149;border-radius:50%;width:28px;height:28px;border:2px solid white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;color:white;box-shadow:0 0 16px #f85149">!</div>',icon_size=(28,28),icon_anchor=(14,14)),tooltip="MV Wakashio MMSI:372711000 — ATTRIBUTED").add_to(m4)
-        folium.Circle(REEF,radius=5500,color="#f85149",fill=False,weight=2,dash_array="6 4",tooltip="Attribution Zone").add_to(m4)
+        if not has_coastal:
+            folium.Circle(REEF,radius=5500,color="#f85149",fill=False,weight=2,dash_array="6 4",tooltip="Attribution Zone (fallback)").add_to(m4)
         st_folium(m4,width=None,height=300,returned_objects=[])
+
+# ══════════════════════════════════════════════════════════
+# TAB 5 – COASTAL VULNERABILITY
+# ══════════════════════════════════════════════════════════
+with tab5:
+    st.markdown("#### InVEST Coastal Vulnerability Assessment")
+    st.caption("Biophysical coastal exposure index (wave power, wind fetch, shelf contour, relief, and coral reef/mangrove buffers).")
+
+    from poseatsea import coastal
+    from ui import maps
+    cv_sum = coastal.coastal_summary()
+    pts = coastal.load_exposure_points()
+
+    if cv_sum.get("available") and not pts.empty:
+        k1, k2, k3, k4 = st.columns(4)
+        k1.markdown(f'<div class="kpi-card kpi-info"><div class="kpi-label">Shoreline Analyzed</div><div class="kpi-value">{cv_sum["segments_count"]} pts</div><div class="kpi-delta">250m resolution</div></div>', unsafe_allow_html=True)
+        k2.markdown(f'<div class="kpi-card kpi-danger"><div class="kpi-label">High-Risk Segments</div><div class="kpi-value">{cv_sum["high_risk_segments"]}</div><div class="kpi-delta">{cv_sum["high_risk_pct"]:.1f}% of shoreline</div></div>', unsafe_allow_html=True)
+        k3.markdown(f'<div class="kpi-card kpi-warn"><div class="kpi-label">Max Exposure</div><div class="kpi-value">{cv_sum["max_exposure"]:.2f}</div><div class="kpi-delta">Mean: {cv_sum["mean_exposure"]:.2f} / 5.0</div></div>', unsafe_allow_html=True)
+        k4.markdown(f'<div class="kpi-card kpi-danger"><div class="kpi-label">Dist to Casualty</div><div class="kpi-value">{cv_sum["dist_wakashio_to_high_risk_km"]:.2f} km</div><div class="kpi-delta">to MV Wakashio</div></div>', unsafe_allow_html=True)
+
+        c_map, c_info = st.columns([2.2, 1])
+        with c_map:
+            st.markdown('<div class="section-label">Layer-wise Exposure Map (Use top-right LayerControl to toggle components)</div>', unsafe_allow_html=True)
+            cm = maps.coastal_vulnerability_map(height=480)
+            st_folium(cm, width=None, height=480, returned_objects=[], key="demo_cv_map")
+            st.markdown(maps.legend([
+                {"color": "#3fb950", "label": "Low (≤ 2.0)"},
+                {"color": "#d29922", "label": "Moderate (2.0 - 3.0)"},
+                {"color": "#f85149", "label": "High (3.0 - 4.0)"},
+                {"color": "#bd561d", "label": "Very High (> 4.0)"},
+            ]), unsafe_allow_html=True)
+            st.markdown(maps.component_legend(), unsafe_allow_html=True)
+        with c_info:
+            st.markdown('<div class="section-label">Biophysical Components</div>', unsafe_allow_html=True)
+            st.markdown(f"""<div class="kpi-card" style="line-height:1.7;font-size:.85rem">
+  <b>Storm Surge (R_surge):</b> {cv_sum['avg_r_surge']:.2f} / 5.0<br>
+  <b>Wind Fetch (R_wind):</b> {cv_sum['avg_r_wind']:.2f} / 5.0<br>
+  <b>Natural Habitats (R_hab):</b> {cv_sum['avg_r_hab']:.2f} / 5.0<br>
+  <b>Wave Energy (R_wave):</b> {cv_sum['avg_r_wave']:.2f} / 5.0<br>
+  <b>Coastal Relief (R_relief):</b> {cv_sum['avg_r_relief']:.2f} / 5.0
+</div>""", unsafe_allow_html=True)
+            st.markdown('<div class="section-label">Segment Inspector</div>', unsafe_allow_html=True)
+            s_idx = st.slider("Inspect Segment", 0, len(pts)-1, 0, key="demo_cv_slider")
+            row = pts.iloc[s_idx]
+            dist_val = row.get("dist_to_grounding_km")
+            dist_str = f"{float(dist_val):.2f} km to reef" if dist_val is not None and not pd.isna(dist_val) else ""
+            st.markdown(f"""<div class="kpi-card" style="font-size:.82rem;line-height:1.6">
+  <b>Segment #{int(row.get('shore_id', s_idx))} &middot; {row.get('exposure_tier', 'Unknown')}</b><br>
+  {dist_str}<br>
+  Exposure Index: <code>{float(row.get('exposure_index', 0.0)):.2f}</code><br>
+  Habitats: <b>{float(row.get('r_hab', 1.0)):.0f}</b> &middot; Wave: <b>{float(row.get('r_wave', 1.0)):.0f}</b> &middot; Wind: <b>{float(row.get('r_wind', 1.0)):.0f}</b><br>
+  Relief: <b>{float(row.get('r_relief', 1.0)):.0f}</b> &middot; Surge: <b>{float(row.get('r_surge', 1.0)):.0f}</b>
+</div>""", unsafe_allow_html=True)
+    else:
+        st.info("InVEST Coastal Vulnerability output layer pending. Run python scripts/run_coastal_vulnerability.py")
 
 st.markdown("---")
 st.markdown('<div style="text-align:center;color:#30363d;font-size:.78rem;padding:8px 0">Maritime Surveillance &amp; Oil Spill Attribution | Smart India Hackathon 2026 | LSTM Trajectory + AIS Anomaly + SAR Segmentation</div>', unsafe_allow_html=True)
