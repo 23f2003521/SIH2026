@@ -67,10 +67,14 @@ def render() -> None:
             {"color": theme.CRITICAL, "label": "MV Wakashio (suspect)"},
             {"color": theme.WARN, "label": "Flagged AIS ping"},
             {"color": theme.ACCENT, "label": "Other traffic"},
+            {"color": "#3fb950", "label": "Low Coastal Risk"},
+            {"color": "#d29922", "label": "Moderate Risk"},
+            {"color": "#f85149", "label": "High Risk"},
+            {"color": "#bd561d", "label": "Very High Risk"},
         ]), unsafe_allow_html=True)
         theme.provenance(
-            "Esri World Imagery. The red ring is the 5 km hazard radius around "
-            "Pointe d'Esny; amber dots are pings the autoencoder flagged."
+            "Esri World Imagery. Colored shoreline points render the InVEST Coastal "
+            "Vulnerability model output. Amber dots are pings the autoencoder flagged."
         )
 
     with right:
@@ -106,6 +110,40 @@ MMSI {vessel['mmsi']} &middot; IMO {vessel['imo']}<br>
 """,
             unsafe_allow_html=True,
         )
+
+        # Coastal Vulnerability status card
+        from poseatsea import coastal
+        cv_summary = coastal.coastal_summary()
+        if cv_summary["available"]:
+            st.markdown(
+                f"""
+<div class="pos-card">
+<div class="pos-label">InVEST Coastal Vulnerability</div>
+<div style="font-size:.87rem;line-height:1.65">
+<b>Shoreline Analyzed:</b> {cv_summary['segments_count']} coastal points<br>
+<b>Max Exposure Index:</b> {cv_summary['max_exposure']:.2f} / 5.0 (Mean: {cv_summary['mean_exposure']:.2f})<br>
+<b>High-Risk Shoreline:</b> {cv_summary['high_risk_segments']} segments ({cv_summary['high_risk_pct']:.1f}%)<br>
+<b>Proximity to High Risk:</b> {cv_summary['dist_wakashio_to_high_risk_km']:.2f} km<br>
+<b>Major Drivers:</b> Surge ({cv_summary['avg_r_surge']:.1f}) &middot; Wind ({cv_summary['avg_r_wind']:.1f}) &middot; Wave ({cv_summary['avg_r_wave']:.1f})
+</div>
+<div class="pos-sub" style="margin-top:.6rem">Biophysical coastal exposure index (wave power, wind fetch, shelf contour, relief, and coral reef/mangrove buffers).</div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"""
+<div class="pos-card">
+<div class="pos-label">InVEST Coastal Vulnerability</div>
+<div style="font-size:.85rem;color:{theme.MUTED};line-height:1.5">
+Biophysical inputs prepared (GEBCO, Copernicus DSM, ERA5 WWIII, and reef/mangrove habitats).
+Run <code>python scripts/run_coastal_vulnerability.py</code> to refresh exposure points.
+</div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
 
     # ---------------------------------------------------------------- verdict
     if top:

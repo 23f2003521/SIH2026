@@ -24,6 +24,7 @@ st.set_page_config(
 from ui import engine, theme  # noqa: E402
 from ui.views import (  # noqa: E402
     ais_view,
+    coastal_view,
     overview,
     sar_view,
     trajectory_view,
@@ -38,6 +39,7 @@ PAGES = {
     "AIS Anomaly Detection": ais_view.render,
     "Route Deviation (LSTM)": trajectory_view.render,
     "SAR Oil Spill Segmenter": sar_view.render,
+    "Coastal Vulnerability": coastal_view.render,
 }
 
 

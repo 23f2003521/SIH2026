@@ -1,0 +1,377 @@
+from pathlib import Path
+import math
+import numpy as np
+from netCDF4 import Dataset
+from osgeo import ogr, osr
+
+
+WIND_FILE = Path(
+    "assets/significant_height_of_combined_wind_waves_swell/"
+    "reanalysis-era5-single-levels-timeseries-sfcm_puf_m6.nc"
+)
+
+WAVE_FILE = Path(
+    "assets/significant_height_of_combined_wind_waves_swell/"
+    "reanalysis-era5-single-levels-timeseries-wavx0_vb0k1.nc"
+)
+
+OUTPUT = Path(
+    "assets/coastal_vulnerability/wwiii_era5_mauritius.gpkg"
+)
+
+SECTORS = [0, 22, 45, 67, 90, 112, 135, 157,
+           180, 202, 225, 247, 270, 292, 315, 337]
+
+
+def sector_index(direction):
+    """Assign a direction in [0,360) to nearest 22.5-degree sector."""
+    direction = direction % 360
+    index = int(np.floor((direction + 11.25) / 22.5)) % 16
+    return index
+
+
+def wind_direction_from_uv(u, v):
+    """
+    Meteorological wind direction: direction FROM which wind blows.
+
+    ERA5 u10 = eastward component
+    ERA5 v10 = northward component
+    """
+    direction = (270.0 - np.degrees(np.arctan2(v, u))) % 360.0
+    return direction
+
+
+def wave_power_kw_m(hs, period):
+    """
+    Deep-water wave-power approximation.
+
+    P = rho*g^2/(64*pi) * Hs^2 * T
+
+    Approximate coefficient = 0.49 kW/m when Hs is metres
+    and T is seconds.
+    """
+    return 0.49 * hs ** 2 * period
+
+
+def directional_statistics(values, directions):
+    """
+    Calculate directional highest-10% statistics.
+
+    Returns:
+        pct[16] : percentage of highest-10% observations in sector
+        avg[16] : average value of highest-10% observations in sector
+    """
+    values = np.asarray(values, dtype=float)
+    directions = np.asarray(directions, dtype=float)
+
+    valid = np.isfinite(values) & np.isfinite(directions)
+    values = values[valid]
+    directions = directions[valid]
+
+    result_pct = np.zeros(16, dtype=float)
+    result_avg = np.zeros(16, dtype=float)
+
+    if len(values) == 0:
+        return result_pct, result_avg
+
+    # Highest 10% of the complete record.
+    threshold = np.percentile(values, 90.0)
+    high = values >= threshold
+
+    high_values = values[high]
+    high_directions = directions[high]
+
+    if len(high_values) == 0:
+        return result_pct, result_avg
+
+    counts = np.zeros(16, dtype=int)
+
+    for value, direction in zip(high_values, high_directions):
+        idx = sector_index(direction)
+        counts[idx] += 1
+        result_avg[idx] += value
+
+    total = len(high_values)
+
+    for i in range(16):
+        if counts[i] > 0:
+            result_pct[i] = 100.0 * counts[i] / total
+            result_avg[i] /= counts[i]
+
+    return result_pct, result_avg
+
+
+def add_field(layer, name):
+    field = ogr.FieldDefn(name, ogr.OFTReal)
+    field.SetWidth(20)
+    field.SetPrecision(8)
+    layer.CreateField(field)
+
+
+# ----------------------------------------------------------------------
+# Read ERA5
+# ----------------------------------------------------------------------
+
+print("Reading ERA5 wind...")
+
+with Dataset(WIND_FILE) as ds:
+    lats = np.asarray(ds.variables["latitude"][:], dtype=float)
+    lons = np.asarray(ds.variables["longitude"][:], dtype=float)
+
+    u10 = np.asarray(ds.variables["u10"][:], dtype=float)
+    v10 = np.asarray(ds.variables["v10"][:], dtype=float)
+
+print("Wind grid:", len(lats), "x", len(lons))
+print("Wind time steps:", u10.shape[0])
+
+
+print("Reading ERA5 waves...")
+
+with Dataset(WAVE_FILE) as ds:
+    wave_lats = np.asarray(ds.variables["latitude"][:], dtype=float)
+    wave_lons = np.asarray(ds.variables["longitude"][:], dtype=float)
+
+    mwd = np.asarray(ds.variables["mwd"][:], dtype=float)
+    mwp = np.asarray(ds.variables["mwp"][:], dtype=float)
+    swh = np.asarray(ds.variables["swh"][:], dtype=float)
+
+print("Wave grid:", len(wave_lats), "x", len(wave_lons))
+print("Wave time steps:", swh.shape[0])
+
+
+# ----------------------------------------------------------------------
+# Create output GPKG
+# ----------------------------------------------------------------------
+
+OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+
+if OUTPUT.exists():
+    OUTPUT.unlink()
+
+driver = ogr.GetDriverByName("GPKG")
+gpkg = driver.CreateDataSource(str(OUTPUT))
+
+srs = osr.SpatialReference()
+srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+srs.ImportFromEPSG(4326)
+
+layer = gpkg.CreateLayer(
+    "wwiii_era5",
+    srs,
+    ogr.wkbPoint
+)
+
+# Add all 80 required fields.
+for sector in SECTORS:
+    add_field(layer, f"REI_PCT{sector}")
+    add_field(layer, f"REI_V{sector}")
+    add_field(layer, f"WavPPCT{sector}")
+    add_field(layer, f"WavP_{sector}")
+    add_field(layer, f"V10PCT_{sector}")
+
+# Extra provenance fields.
+add_field(layer, "wind_n")
+add_field(layer, "wave_n")
+add_field(layer, "wind_max")
+add_field(layer, "wave_power_max")
+
+
+# ----------------------------------------------------------------------
+# Build wave statistics for each wave location
+# ----------------------------------------------------------------------
+
+wave_stats = {}
+
+for wi, lat in enumerate(wave_lats):
+    for wj, lon in enumerate(wave_lons):
+
+        hs = swh[:, wi, wj]
+        period = mwp[:, wi, wj]
+        direction = mwd[:, wi, wj]
+
+        power = wave_power_kw_m(hs, period)
+
+        # Remove invalid / nonphysical observations.
+        valid = (
+            np.isfinite(power) &
+            np.isfinite(direction) &
+            (hs >= 0) &
+            (period > 0) &
+            (power >= 0)
+        )
+
+        wave_pct, wave_avg = directional_statistics(
+            power[valid],
+            direction[valid]
+        )
+
+        wave_stats[(float(lat), float(lon))] = {
+            "pct": wave_pct,
+            "avg": wave_avg,
+            "n": int(np.sum(valid)),
+            "max": float(np.nanmax(power[valid]))
+        }
+
+
+# ----------------------------------------------------------------------
+# Build one WWIII point for every ERA5 wind grid point.
+#
+# Wave forcing:
+#   interpolate between the two available ERA5 wave locations
+#   along longitude.
+# ----------------------------------------------------------------------
+
+wave_points = sorted(wave_stats.keys())
+
+def interpolate_wave_stats(lat, lon):
+    """
+    Interpolate wave statistics between available ERA5 wave points.
+    """
+
+    # Current ERA5 wave grid is one latitude with two longitude points.
+    p1 = wave_stats[wave_points[0]]
+    p2 = wave_stats[wave_points[-1]]
+
+    lon1 = wave_points[0][1]
+    lon2 = wave_points[-1][1]
+
+    if lon <= lon1:
+        weight = 0.0
+    elif lon >= lon2:
+        weight = 1.0
+    else:
+        weight = (lon - lon1) / (lon2 - lon1)
+
+    pct = (
+        (1.0 - weight) * p1["pct"] +
+        weight * p2["pct"]
+    )
+
+    avg = (
+        (1.0 - weight) * p1["avg"] +
+        weight * p2["avg"]
+    )
+
+    return pct, avg
+
+
+# ----------------------------------------------------------------------
+# Create features
+# ----------------------------------------------------------------------
+
+feature_count = 0
+
+for i, lat in enumerate(lats):
+    for j, lon in enumerate(lons):
+
+        wind_u = u10[:, i, j]
+        wind_v = v10[:, i, j]
+
+        wind_speed = np.sqrt(wind_u ** 2 + wind_v ** 2)
+        wind_direction = wind_direction_from_uv(wind_u, wind_v)
+
+        valid = (
+            np.isfinite(wind_speed) &
+            np.isfinite(wind_direction)
+        )
+
+        wind_speed = wind_speed[valid]
+        wind_direction = wind_direction[valid]
+
+        rei_pct, rei_v = directional_statistics(
+            wind_speed,
+            wind_direction
+        )
+
+        # V10PCT_X is the average highest-10% wind speed
+        # centered on sector X.
+        #
+        # For each sector, include observations within ±11.25°.
+        v10pct = np.zeros(16, dtype=float)
+
+        threshold = np.percentile(wind_speed, 90.0)
+        high_mask = wind_speed >= threshold
+
+        high_speed = wind_speed[high_mask]
+        high_direction = wind_direction[high_mask]
+
+        for sector_index_value, sector in enumerate(SECTORS):
+
+            delta = np.abs(
+                ((high_direction - sector + 180.0) % 360.0) - 180.0
+            )
+
+            selected = delta <= 11.25
+
+            if np.any(selected):
+                v10pct[sector_index_value] = np.mean(
+                    high_speed[selected]
+                )
+
+        # Wave statistics.
+        wave_pct, wave_avg = interpolate_wave_stats(
+            float(lat),
+            float(lon)
+        )
+
+        feature = ogr.Feature(layer.GetLayerDefn())
+
+        point = ogr.Geometry(ogr.wkbPoint)
+        point.AddPoint(float(lon), float(lat))
+        feature.SetGeometry(point)
+
+        for k, sector in enumerate(SECTORS):
+            feature.SetField(
+                f"REI_PCT{sector}",
+                float(rei_pct[k])
+            )
+
+            feature.SetField(
+                f"REI_V{sector}",
+                float(rei_v[k])
+            )
+
+            feature.SetField(
+                f"WavPPCT{sector}",
+                float(wave_pct[k])
+            )
+
+            feature.SetField(
+                f"WavP_{sector}",
+                float(wave_avg[k])
+            )
+
+            feature.SetField(
+                f"V10PCT_{sector}",
+                float(v10pct[k])
+            )
+
+        feature.SetField("wind_n", len(wind_speed))
+        feature.SetField("wave_n", int(
+            np.mean([
+                wave_stats[p]["n"] for p in wave_points
+            ])
+        ))
+        feature.SetField("wind_max", float(np.max(wind_speed)))
+        feature.SetField(
+            "wave_power_max",
+            float(np.mean([
+                wave_stats[p]["max"] for p in wave_points
+            ]))
+        )
+
+        layer.CreateFeature(feature)
+
+        feature = None
+        point = None
+
+        feature_count += 1
+
+
+gpkg = None
+
+print()
+print("Created:", OUTPUT)
+print("Features:", feature_count)
+print("Required WWIII fields:", 80)
+print("Grid:", len(lats), "x", len(lons))

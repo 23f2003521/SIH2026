@@ -116,3 +116,18 @@ NAV_STATUS = {
     8: "Under way sailing",
     15: "Undefined",
 }
+
+# --------------------------------------------------------------------------
+# InVEST Coastal Vulnerability
+# --------------------------------------------------------------------------
+COASTAL_DIR = PROJECT_ROOT / "assets/coastal_vulnerability"
+COASTAL_AOI = COASTAL_DIR / "mauritius_aoi_final.gpkg"
+COASTAL_WWIII = COASTAL_DIR / "wwiii_era5_mauritius.gpkg"
+COASTAL_SHELF_200M = COASTAL_DIR / "shelf_contour_200m.gpkg"
+COASTAL_EXPOSURE_GEOJSON = COASTAL_DIR / "coastal_exposure.geojson"
+COASTAL_HABITATS_CSV = COASTAL_DIR / "natural_habitats.csv"
+
+# Model parameters
+COASTAL_MODEL_RESOLUTION_M = 250.0
+COASTAL_MAX_FETCH_M = 12000.0
+COASTAL_DEM_AVERAGING_RADIUS_M = 2000.0
