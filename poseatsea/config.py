@@ -15,7 +15,14 @@ import torch
 # --------------------------------------------------------------------------
 # Paths
 # --------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_env_root = os.getenv("POSEATSEA_ROOT")
+if _env_root and Path(_env_root).exists():
+    PROJECT_ROOT = Path(_env_root).resolve()
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    if not (PROJECT_ROOT / "assets").exists() and (Path.cwd() / "assets").exists():
+        PROJECT_ROOT = Path.cwd().resolve()
+
 MODELS_DIR = Path(os.getenv("POSEATSEA_MODELS_DIR", PROJECT_ROOT / "models"))
 
 SAR_WEIGHTS = MODELS_DIR / "best_sar_model.pth"

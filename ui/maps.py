@@ -124,9 +124,16 @@ def add_reef(fmap: folium.Map, label: str = "Pointe d'Esny reef") -> None:
     add_coastal_vulnerability(fmap, show_hazard_ring=False)
 
 
-def coastal_vulnerability_map(height: int = 540, active_layer: str = "Overall Exposure") -> folium.Map:
+def coastal_vulnerability_map(
+    height: int = 540,
+    active_layer: str = "Overall Exposure",
+    selected_segment: Optional[int] = None,
+    show_habitats: bool = True,
+    show_buffers: bool = True,
+) -> folium.Map:
     """
     Dedicated InVEST Coastal Vulnerability map for the selected thematic layer.
+    Supports habitat polygon overlays (coral reef & mangrove) and active segment inspection highlighting.
     Renders clean satellite canvas with zero overlay obstruction.
     """
     from poseatsea import coastal
@@ -139,6 +146,45 @@ def coastal_vulnerability_map(height: int = 540, active_layer: str = "Overall Ex
         add_coastal_vulnerability(fmap, show_hazard_ring=True)
         return fmap
 
+    # 1. Authoritative Habitat Polygons (Coral Reef & Mangrove)
+    if show_habitats:
+        coral_fc = coastal.load_habitat_geojson("coral_reef")
+        if coral_fc and coral_fc.get("features"):
+            folium.GeoJson(
+                coral_fc,
+                name="Coral Reefs",
+                style_function=lambda x: {
+                    "fillColor": "#00d2d2",
+                    "color": "#009999",
+                    "weight": 1.5,
+                    "fillOpacity": 0.38,
+                },
+                tooltip=folium.GeoJsonTooltip(
+                    fields=["habitat_type", "area_ha"],
+                    aliases=["Habitat:", "Area (ha):"],
+                    localize=True,
+                ) if coral_fc["features"] and "area_ha" in coral_fc["features"][0].get("properties", {}) else "Coral Reef Barrier",
+            ).add_to(fmap)
+
+        mangrove_fc = coastal.load_habitat_geojson("mangrove")
+        if mangrove_fc and mangrove_fc.get("features"):
+            folium.GeoJson(
+                mangrove_fc,
+                name="Mangroves",
+                style_function=lambda x: {
+                    "fillColor": "#2ea043",
+                    "color": "#1f6f2e",
+                    "weight": 1.5,
+                    "fillOpacity": 0.45,
+                },
+                tooltip=folium.GeoJsonTooltip(
+                    fields=["habitat_type", "area_ha"],
+                    aliases=["Habitat:", "Area (ha):"],
+                    localize=True,
+                ) if mangrove_fc["features"] and "area_ha" in mangrove_fc["features"][0].get("properties", {}) else "Estuarine Mangrove",
+            ).add_to(fmap)
+
+    # 2. Shoreline Exposure Points
     layer_lower = (active_layer or "").lower()
 
     for row in exposure_df.itertuples():
@@ -218,6 +264,79 @@ def coastal_vulnerability_map(height: int = 540, active_layer: str = "Overall Ex
             tooltip=tip,
             popup=folium.Popup(popup_html, max_width=250),
         ).add_to(fmap)
+
+    # 3. Inspected Shore Segment Highlight & Defense Buffers
+    if selected_segment is not None:
+        match_rows = exposure_df[exposure_df["shore_id"] == selected_segment]
+        if match_rows.empty and 0 <= selected_segment < len(exposure_df):
+            match_rows = exposure_df.iloc[[selected_segment]]
+
+        if not match_rows.empty:
+            sel_row = match_rows.iloc[0]
+            sel_lat = float(sel_row["latitude"])
+            sel_lon = float(sel_row["longitude"])
+            sel_id = int(sel_row["shore_id"])
+
+            prof = coastal.get_segment_habitat_profile(sel_id)
+
+            if show_buffers:
+                if prof.get("has_coral", False):
+                    folium.Circle(
+                        [sel_lat, sel_lon],
+                        radius=2000,
+                        color="#00d2d2",
+                        weight=1.8,
+                        dash_array="6, 6",
+                        fill=True,
+                        fill_color="#00d2d2",
+                        fill_opacity=0.08,
+                        tooltip=f"Segment #{sel_id} Coral Reef Attenuation Buffer (2,000 m)",
+                    ).add_to(fmap)
+
+                if prof.get("has_mangrove", False):
+                    folium.Circle(
+                        [sel_lat, sel_lon],
+                        radius=1000,
+                        color="#2ea043",
+                        weight=1.8,
+                        dash_array="4, 4",
+                        fill=True,
+                        fill_color="#2ea043",
+                        fill_opacity=0.10,
+                        tooltip=f"Segment #{sel_id} Mangrove Surge Buffer (1,000 m)",
+                    ).add_to(fmap)
+
+                dist_km = prof.get("dist_to_grounding_km", 0.0)
+                folium.PolyLine(
+                    locations=[[sel_lat, sel_lon], REEF],
+                    color="#f85149",
+                    weight=1.5,
+                    dash_array="4, 6",
+                    opacity=0.75,
+                    tooltip=f"Direct Vector to Grounding: {dist_km:.2f} km",
+                ).add_to(fmap)
+
+            # Outer gold highlight ring
+            folium.CircleMarker(
+                [sel_lat, sel_lon],
+                radius=13,
+                color="#ffd700",
+                fill=False,
+                weight=3.5,
+                opacity=0.95,
+                tooltip=f"<b>Inspected Segment #{sel_id}</b>",
+            ).add_to(fmap)
+
+            # Inner bright core marker
+            folium.CircleMarker(
+                [sel_lat, sel_lon],
+                radius=5.5,
+                color="#ffffff",
+                fill=True,
+                fill_color="#ffd700",
+                fill_opacity=1.0,
+                weight=2,
+            ).add_to(fmap)
 
     # Grounding Site Reference Marker
     folium.Marker(
@@ -420,4 +539,16 @@ def component_legend() -> str:
         {"color": "#bd561d", "label": "Rank 5 (High exposure / Unprotected)"},
     ]
     return legend(items)
+
+
+def habitat_legend() -> str:
+    """Legend for habitat polygons and operational defense features."""
+    items = [
+        {"color": "#00d2d2", "label": "Coral Reef Barrier (2,000 m buffer)"},
+        {"color": "#2ea043", "label": "Estuarine Mangroves (1,000 m buffer)"},
+        {"color": "#ffd700", "label": "Inspected Shoreline Segment"},
+        {"color": theme.CRITICAL, "label": "MV Wakashio Grounding Site"},
+    ]
+    return legend(items)
+
 

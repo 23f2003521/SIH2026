@@ -524,13 +524,14 @@ with tab4:
 # TAB 5 – COASTAL VULNERABILITY
 # ══════════════════════════════════════════════════════════
 with tab5:
-    st.markdown("#### InVEST Coastal Vulnerability Assessment")
-    st.caption("Biophysical coastal exposure index (wave power, wind fetch, shelf contour, relief, and coral reef/mangrove buffers).")
-
     from poseatsea import coastal
     from ui import maps
     cv_sum = coastal.coastal_summary()
     pts = coastal.load_exposure_points()
+
+    mode_tag = '<span style="font-size:.72rem;padding:2px 7px;border-radius:4px;background:#3ddc9722;color:#3ddc97;border:1px solid #3ddc9744">● Live InVEST</span>' if cv_sum.get("execution_mode") == "live" else '<span style="font-size:.72rem;padding:2px 7px;border-radius:4px;background:#8ea3bf22;color:#8ea3bf;border:1px solid #8ea3bf44">Using cached analysis</span>'
+    st.markdown(f"#### InVEST Coastal Vulnerability Assessment &nbsp;{mode_tag}", unsafe_allow_html=True)
+    st.caption("Biophysical coastal exposure index (wave power, wind fetch, shelf contour, relief, and coral reef/mangrove buffers).")
 
     if cv_sum.get("available") and not pts.empty:
         k1, k2, k3, k4 = st.columns(4)
@@ -539,7 +540,8 @@ with tab5:
         k3.markdown(f'<div class="kpi-card kpi-warn"><div class="kpi-label">Max Exposure</div><div class="kpi-value">{cv_sum["max_exposure"]:.2f}</div><div class="kpi-delta">Mean: {cv_sum["mean_exposure"]:.2f} / 5.0</div></div>', unsafe_allow_html=True)
         k4.markdown(f'<div class="kpi-card kpi-danger"><div class="kpi-label">Dist to Casualty</div><div class="kpi-value">{cv_sum["dist_wakashio_to_high_risk_km"]:.2f} km</div><div class="kpi-delta">to MV Wakashio</div></div>', unsafe_allow_html=True)
 
-        c_map, c_info = st.columns([2.2, 1])
+        demo_s_idx = st.session_state.get("demo_cv_slider", 77)
+        c_map, c_info = st.columns([1.7, 1.1])
         with c_map:
             c_ttl, c_lyr = st.columns([1, 1.45])
             with c_ttl:
@@ -558,8 +560,18 @@ with tab5:
                     key="demo_cv_layer_sel",
                     label_visibility="collapsed",
                 )
-            cm = maps.coastal_vulnerability_map(height=480, active_layer=demo_layer)
-            st_folium(cm, width=None, height=480, returned_objects=[], key=f"demo_cv_map_{demo_layer}")
+            c_dt1, c_dt2 = st.columns(2)
+            demo_show_hab = c_dt1.checkbox("Habitat Polygons", value=True, key="demo_cv_show_hab")
+            demo_show_buf = c_dt2.checkbox("Highlight & Buffers", value=True, key="demo_cv_show_buf")
+
+            cm = maps.coastal_vulnerability_map(
+                height=480,
+                active_layer=demo_layer,
+                selected_segment=demo_s_idx,
+                show_habitats=demo_show_hab,
+                show_buffers=demo_show_buf,
+            )
+            st_folium(cm, width=None, height=480, returned_objects=[], key=f"demo_cv_map_{demo_layer}_{demo_s_idx}_{demo_show_hab}_{demo_show_buf}")
             if demo_layer == "Overall Exposure":
                 st.markdown(maps.legend([
                     {"color": "#3fb950", "label": "Low (≤ 2.0)"},
@@ -569,29 +581,67 @@ with tab5:
                 ]), unsafe_allow_html=True)
             else:
                 st.markdown(maps.component_legend(), unsafe_allow_html=True)
+
+            if demo_show_hab or demo_show_buf:
+                st.markdown(maps.habitat_legend(), unsafe_allow_html=True)
+
         with c_info:
-            st.markdown('<div class="section-label">Biophysical Components</div>', unsafe_allow_html=True)
-            st.markdown(f"""<div class="kpi-card" style="line-height:1.7;font-size:.85rem">
-  <b>Storm Surge (R_surge):</b> {cv_sum['avg_r_surge']:.2f} / 5.0<br>
-  <b>Wind Fetch (R_wind):</b> {cv_sum['avg_r_wind']:.2f} / 5.0<br>
-  <b>Natural Habitats (R_hab):</b> {cv_sum['avg_r_hab']:.2f} / 5.0<br>
-  <b>Wave Energy (R_wave):</b> {cv_sum['avg_r_wave']:.2f} / 5.0<br>
-  <b>Coastal Relief (R_relief):</b> {cv_sum['avg_r_relief']:.2f} / 5.0
-</div>""", unsafe_allow_html=True)
             st.markdown('<div class="section-label">Segment Inspector</div>', unsafe_allow_html=True)
-            s_idx = st.slider("Inspect Segment", 0, len(pts)-1, 0, key="demo_cv_slider")
-            row = pts.iloc[s_idx]
-            dist_val = row.get("dist_to_grounding_km")
-            dist_str = f"{float(dist_val):.2f} km to reef" if dist_val is not None and not pd.isna(dist_val) else ""
-            st.markdown(f"""<div class="kpi-card" style="font-size:.82rem;line-height:1.6">
-  <b>Segment #{int(row.get('shore_id', s_idx))} &middot; {row.get('exposure_tier', 'Unknown')}</b><br>
-  {dist_str}<br>
-  Exposure Index: <code>{float(row.get('exposure_index', 0.0)):.2f}</code><br>
-  Habitats: <b>{float(row.get('r_hab', 1.0)):.0f}</b> &middot; Wave: <b>{float(row.get('r_wave', 1.0)):.0f}</b> &middot; Wind: <b>{float(row.get('r_wind', 1.0)):.0f}</b><br>
-  Relief: <b>{float(row.get('r_relief', 1.0)):.0f}</b> &middot; Surge: <b>{float(row.get('r_surge', 1.0)):.0f}</b>
+            s_idx = st.slider("Inspect Segment", 0, len(pts)-1, demo_s_idx, key="demo_cv_slider")
+            prof = coastal.get_segment_habitat_profile(s_idx)
+
+            coral_tag = (
+                f'<span style="color:#00d2d2;font-weight:600">● 2,000 m Reef Active ({prof.get("coral_area_km2", 0):.1f} km²)</span>'
+                if prof.get("has_coral")
+                else '<span style="color:#8b949e">○ No Reef Buffer</span>'
+            )
+            mangrove_tag = (
+                f'<span style="color:#2ea043;font-weight:600">● 1,000 m Mangrove Active ({prof.get("mangrove_area_km2", 0):.1f} km²)</span>'
+                if prof.get("has_mangrove")
+                else '<span style="color:#8b949e">○ No Mangrove Buffer</span>'
+            )
+
+            st.markdown(f"""<div class="kpi-card" style="font-size:.82rem;line-height:1.55;margin-bottom:8px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <b>Segment #{prof['shore_id']}</b>
+    <span style="color:{prof['tier_color']};font-weight:700">{prof['exposure_tier']} Risk</span>
+  </div>
+  <div style="color:#8b949e;font-size:.74rem;font-family:monospace;margin-top:2px">
+    {prof['latitude']:.4f}&deg; N, {prof['longitude']:.4f}&deg; E &middot; {prof['dist_to_grounding_km']:.2f} km to reef
+  </div>
+  <div style="margin-top:6px">
+    Exposure Index: <code>{prof['exposure_index']:.2f}</code><br>
+    Habitat Defense: <b style="color:#3ddc97">▼ {prof['habitat_role']:.2f} pts</b> (-{prof['habitat_role_pct']:.0f}%)<br>
+    Coral Reef: {coral_tag}<br>
+    Mangrove: {mangrove_tag}
+  </div>
+</div>""", unsafe_allow_html=True)
+
+            st.markdown('<div class="section-label">Habitat &amp; Species Impact</div>', unsafe_allow_html=True)
+            species_preview = []
+            if prof.get("has_coral"):
+                species_preview.append("• <i>Acropora muricata</i> (Staghorn Coral) · Reef dissipator")
+                species_preview.append("• <i>Chelonia mydas</i> (Green Sea Turtle) · Endangered")
+            if prof.get("has_mangrove"):
+                species_preview.append("• <i>Rhizophora mucronata</i> (Red Mangrove) · Prop roots")
+                species_preview.append("• <i>Lutjanus kasmira</i> (Bluestripe Snapper) · Nursery")
+            if not species_preview:
+                species_preview.append("• Shoreline is outside natural habitat buffer zones (> 2 km).")
+
+            sp_html = "<br>".join(species_preview)
+            st.markdown(f"""<div class="kpi-card" style="font-size:.78rem;line-height:1.45;margin-bottom:8px">
+  <b>Documented Indicator Taxa ({prof['species_count']}):</b><br>
+  {sp_html}
+  <div style="font-size:.71rem;color:#8b949e;margin-top:4px">
+    Ramsar Site #1798 / Blue Bay Marine Park baseline.
+  </div>
+</div>""", unsafe_allow_html=True)
+
+            st.markdown(f"""<div class="kpi-card" style="font-size:.76rem;line-height:1.45;color:#c9d1d9;border-left:3px solid #31c8e8">
+  {prof['ecological_summary']}
 </div>""", unsafe_allow_html=True)
     else:
-        st.info("InVEST Coastal Vulnerability output layer pending. Run python scripts/run_coastal_vulnerability.py")
+        st.warning("InVEST Coastal Vulnerability layer unavailable.")
 
 st.markdown("---")
 st.markdown('<div style="text-align:center;color:#30363d;font-size:.78rem;padding:8px 0">Maritime Surveillance &amp; Oil Spill Attribution | Smart India Hackathon 2026 | LSTM Trajectory + AIS Anomaly + SAR Segmentation</div>', unsafe_allow_html=True)

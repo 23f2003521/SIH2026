@@ -300,6 +300,8 @@
       "overview_view": "ui/views/overview.py",
       "coastal_view": "ui/views/coastal_view.py",
       "standalone_demo": "demo_app.py",
+      "habitat_and_species_impact": "fully_integrated_with_segment_profiles_and_map_layers",
+      "deployment_resilience": "automatic_live_execution_with_silent_cached_fallback_and_memory_caching",
       "status": "fully_integrated_with_dedicated_view"
     },
 

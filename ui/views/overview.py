@@ -118,7 +118,7 @@ MMSI {vessel['mmsi']} &middot; IMO {vessel['imo']}<br>
             st.markdown(
                 f"""
 <div class="pos-card">
-<div class="pos-label">InVEST Coastal Vulnerability</div>
+<div class="pos-label">InVEST Coastal Vulnerability &middot; <span style="text-transform:none">{cv_summary.get('mode_label', 'Cached')}</span></div>
 <div style="font-size:.87rem;line-height:1.65">
 <b>Shoreline Analyzed:</b> {cv_summary['segments_count']} coastal points<br>
 <b>Max Exposure Index:</b> {cv_summary['max_exposure']:.2f} / 5.0 (Mean: {cv_summary['mean_exposure']:.2f})<br>
@@ -137,8 +137,7 @@ MMSI {vessel['mmsi']} &middot; IMO {vessel['imo']}<br>
 <div class="pos-card">
 <div class="pos-label">InVEST Coastal Vulnerability</div>
 <div style="font-size:.85rem;color:{theme.MUTED};line-height:1.5">
-Biophysical inputs prepared (GEBCO, Copernicus DSM, ERA5 WWIII, and reef/mangrove habitats).
-Run <code>python scripts/run_coastal_vulnerability.py</code> to refresh exposure points.
+Biophysical coastal vulnerability layer unavailable.
 </div>
 </div>
 """,

@@ -1,4 +1,4 @@
-"""Dedicated Coastal Vulnerability page -- InVEST biophysical exposure model."""
+"""Dedicated Coastal Vulnerability page -- InVEST biophysical exposure & habitat impact model."""
 from __future__ import annotations
 
 import pandas as pd
@@ -11,19 +11,27 @@ from .. import maps, theme
 
 def render() -> None:
     st.markdown("## Coastal Vulnerability")
-    st.markdown(
-        f"#### InVEST-based coastal exposure assessment &nbsp;<span style='color:{theme.MUTED};font-weight:400'>"
-        f"Natural Capital Project biophysical model &middot; Mauritius AOI</span>",
-        unsafe_allow_html=True,
-    )
 
     summary = coastal.coastal_summary()
     df = coastal.load_exposure_points()
 
+    mode = summary.get("execution_mode", "cached")
+    if mode == "live":
+        mode_pill = f'<span class="pill" style="background:#3ddc9722;color:#3ddc97;border:1px solid #3ddc9755">● Live InVEST Model</span>'
+    else:
+        mode_pill = f'<span class="pill" style="background:#8ea3bf22;color:#8ea3bf;border:1px solid #8ea3bf44">Using cached analysis</span>'
+
+    st.markdown(
+        f"#### InVEST-based coastal exposure assessment &nbsp;{mode_pill}&nbsp;"
+        f"<span style='color:{theme.MUTED};font-weight:400'>"
+        f"Natural Capital Project biophysical model &middot; Mauritius AOI</span>",
+        unsafe_allow_html=True,
+    )
+
     if not summary.get("available") or df.empty:
         theme.banner(
-            "<b>InVEST Coastal Vulnerability output layer not found.</b> "
-            "Run <code>python scripts/run_coastal_vulnerability.py</code> to generate exposure points.",
+            "<b>InVEST Coastal Vulnerability layer unavailable.</b> "
+            "Neither live InVEST execution nor cached analysis could be loaded.",
             "warn",
         )
         return
@@ -80,7 +88,9 @@ def render() -> None:
     st.markdown("")
 
     # ---------------------------------------------------------------- map & analytics
-    left, right = st.columns([1.65, 1])
+    selected_seg_id = st.session_state.get("coastal_seg_slider", 77)
+
+    left, right = st.columns([1.55, 1.1])
 
     with left:
         c_title, c_sel = st.columns([1, 1.45])
@@ -103,17 +113,35 @@ def render() -> None:
                 key="coastal_active_layer_sel",
             )
 
+        c_t1, c_t2 = st.columns(2)
+        show_habitats = c_t1.checkbox(
+            "Show Habitat Polygons (Coral & Mangrove)",
+            value=True,
+            key="cv_show_habitats",
+        )
+        show_buffers = c_t2.checkbox(
+            "Highlight Active Segment & Buffers",
+            value=True,
+            key="cv_show_buffers",
+        )
+
         st_folium(
-            maps.coastal_vulnerability_map(height=520, active_layer=active_layer),
+            maps.coastal_vulnerability_map(
+                height=520,
+                active_layer=active_layer,
+                selected_segment=selected_seg_id,
+                show_habitats=show_habitats,
+                show_buffers=show_buffers,
+            ),
             use_container_width=True,
             height=520,
             returned_objects=[],
-            key=f"coastal_map_{active_layer}",
+            key=f"coastal_map_{active_layer}_{selected_seg_id}_{show_habitats}_{show_buffers}",
         )
 
         if active_layer == "Overall Exposure":
             st.markdown(
-                f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:8px'>"
+                f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:6px'>"
                 f"OVERALL EXPOSURE TIERS</div>",
                 unsafe_allow_html=True,
             )
@@ -128,11 +156,19 @@ def render() -> None:
             )
         else:
             st.markdown(
-                f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:8px'>"
+                f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:6px'>"
                 f"{active_layer.upper()} (RANKS 1-5)</div>",
                 unsafe_allow_html=True,
             )
             st.markdown(maps.component_legend(), unsafe_allow_html=True)
+
+        if show_habitats or show_buffers:
+            st.markdown(
+                f"<div style='font-size:.78rem;font-weight:600;color:{theme.MUTED};margin-top:4px'>"
+                f"HABITAT & OPERATIONAL FEATURES</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(maps.habitat_legend(), unsafe_allow_html=True)
 
         theme.provenance(
             "InVEST Coastal Vulnerability model (Sharp et al. / Arkema et al. 2013). "
@@ -141,80 +177,172 @@ def render() -> None:
         )
 
     with right:
-        st.markdown("##### Exposure components")
+        # Segment inspector slider
+        st.markdown("##### Shore segment inspector")
+        segment_id = st.slider("Select Shore Segment", 0, len(df) - 1, selected_seg_id, key="coastal_seg_slider")
+        prof = coastal.get_segment_habitat_profile(segment_id)
+
+        # Segment Header Card
         st.markdown(
             f"""
-<div class="pos-card">
-<div class="pos-label">Biophysical Drivers Breakdown</div>
-<div style="font-size:.87rem;line-height:1.75;margin-top:.3rem">
-<b>Storm Surge Potential (R_surge):</b> {summary['avg_r_surge']:.2f} / 5.0<br>
-<b>Wind Fetch Exposure (R_wind):</b> {summary['avg_r_wind']:.2f} / 5.0<br>
-<b>Natural Habitats Buffer (R_hab):</b> {summary['avg_r_hab']:.2f} / 5.0<br>
-<b>Wave Energy Exposure (R_wave):</b> {summary['avg_r_wave']:.2f} / 5.0<br>
-<b>Coastal Elevation/Relief (R_relief):</b> {summary['avg_r_relief']:.2f} / 5.0
-</div>
-<div class="pos-sub" style="margin-top:.5rem">
-Ranks scale 1 to 5. Average surge ({summary['avg_r_surge']:.1f}) and wind fetch ({summary['avg_r_wind']:.1f}) represent the primary environmental exposure drivers across the southeastern Mauritian shore.
-</div>
+<div class="pos-card" style="margin-bottom:0.75rem">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:700;font-size:1.02rem">Shore Segment #{prof['shore_id']}</span>
+    <span style="padding:2px 8px;border-radius:4px;background:{prof['tier_color']}22;color:{prof['tier_color']};font-weight:700;font-size:.78rem;border:1px solid {prof['tier_color']}44">{prof['exposure_tier']} Exposure</span>
+  </div>
+  <div class="mono" style="font-size:.76rem;color:{theme.MUTED};margin-top:4px">
+    {prof['latitude']:.4f}&deg; N, {prof['longitude']:.4f}&deg; E &middot; {prof['dist_to_grounding_km']:.2f} km to MV Wakashio
+  </div>
+  <div style="display:flex;gap:6px;margin-top:8px">
+    <div style="flex:1;background:{theme.PANEL_2};padding:6px 8px;border-radius:6px;border:1px solid {theme.LINE}">
+      <div style="font-size:.67rem;color:{theme.MUTED};text-transform:uppercase">Exposure</div>
+      <div style="font-size:1.05rem;font-weight:700;color:{prof['tier_color']}">{prof['exposure_index']:.2f}</div>
+    </div>
+    <div style="flex:1.1;background:{theme.PANEL_2};padding:6px 8px;border-radius:6px;border:1px solid {theme.LINE}">
+      <div style="font-size:.67rem;color:{theme.MUTED};text-transform:uppercase">Habitat Role</div>
+      <div style="font-size:1.05rem;font-weight:700;color:{theme.GOOD}">▼ {prof['habitat_role']:.2f} <span style="font-size:.72rem;font-weight:500">(-{prof['habitat_role_pct']:.0f}%)</span></div>
+    </div>
+    <div style="flex:1.1;background:{theme.PANEL_2};padding:6px 8px;border-radius:6px;border:1px solid {theme.LINE}">
+      <div style="font-size:.67rem;color:{theme.MUTED};text-transform:uppercase">Active Habitats</div>
+      <div style="font-size:1.05rem;font-weight:700;color:{theme.ACCENT}">{prof['habitats_count']} <span style="font-size:.72rem;font-weight:500">({prof['species_count']} taxa)</span></div>
+    </div>
+  </div>
 </div>
 """,
             unsafe_allow_html=True,
         )
 
-        st.markdown(
-            f"""
-<div class="pos-card">
-<div class="pos-label">Ecosystem Defense Assessment</div>
-<div style="font-size:.85rem;line-height:1.6">
-<b>Coral Reef Buffer:</b> 2,000 m protective radius<br>
-<b>Mangrove Buffer:</b> 1,000 m attenuation zone<br>
-<b>Protection Role:</b> Fringed barrier reefs around Pointe d'Esny and Blue Bay Marine Park dissipate up to 97% of open-ocean swell energy, significantly buffering inshore coastal relief.
-</div>
-</div>
-""",
-            unsafe_allow_html=True,
-        )
+        # Habitat & Species Impact Section
+        st.markdown("##### Habitat & species impact")
 
-        # Segment inspector
-        st.markdown("##### Inspect shore segment")
-        segment_id = st.slider("Segment ID", 0, len(df) - 1, 0, key="coastal_seg_slider")
-        pt = df.iloc[segment_id]
-        shore_id_val = int(pt.get("shore_id", segment_id))
-        tier_val = pt.get("exposure_tier", "Unknown")
-        color_val = pt.get("color", theme.ACCENT)
-        lat_val = float(pt.get("latitude", 0.0))
-        lon_val = float(pt.get("longitude", 0.0))
-        dist_val = pt.get("dist_to_grounding_km")
-        if dist_val is not None and not pd.isna(dist_val):
-            dist_str = f"{float(dist_val):.2f} km to reef"
+        # 1. Coral Reef Card
+        coral_reg = prof["coral_registry"]
+        if prof["has_coral"]:
+            coral_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#00d2d222;color:#00d2d2;font-weight:600;font-size:.72rem;border:1px solid #00d2d255">● 2,000 m Buffer Active ({prof["coral_area_km2"]:.1f} km²)</span>'
+            coral_border = "#00d2d255"
+            coral_taxa_html = "".join([
+                f'<div style="font-size:.78rem;line-height:1.45;margin-top:3px">'
+                f'&bull; <i>{t["scientific"]}</i> ({t["common"]}) &middot; <span style="color:#00d2d2;font-weight:600">{t["status"]}</span><br>'
+                f'<span style="color:{theme.MUTED};font-size:.73rem;padding-left:8px">{t["role"]}</span></div>'
+                for t in coral_reg["taxa"]
+            ])
         else:
-            dist_str = "-- km to reef"
-        ei_val = float(pt.get("exposure_index", 0.0))
+            coral_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#8b949e22;color:#8b949e;font-weight:600;font-size:.72rem;border:1px solid #8b949e44">○ No Buffer Within 2 km</span>'
+            coral_border = theme.LINE
+            coral_taxa_html = f'<div style="font-size:.75rem;color:{theme.MUTED};margin-top:2px">Segment is outside active coral reef buffer (&gt; 2,000 m).</div>'
+
+        st.markdown(
+            f"""
+<div class="pos-card" style="border-left:3px solid #00d2d2;padding:0.75rem 0.9rem;margin-bottom:0.6rem">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:650;font-size:.88rem;color:#00d2d2">Coral Reef Barrier</span>
+    {coral_badge}
+  </div>
+  <div style="font-size:.79rem;line-height:1.45;margin-top:4px">
+    <b>Coastal Defense Role:</b> {coral_reg['protection_service']}.
+  </div>
+  <div style="font-size:.76rem;color:{theme.MUTED};margin-top:5px;font-weight:600">DOCUMENTED ASSOCIATED SPECIES / TAXA:</div>
+  {coral_taxa_html}
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+        # 2. Mangrove Card
+        mangrove_reg = prof["mangrove_registry"]
+        if prof["has_mangrove"]:
+            mangrove_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#2ea04322;color:#2ea043;font-weight:600;font-size:.72rem;border:1px solid #2ea04355">● 1,000 m Buffer Active ({prof["mangrove_area_km2"]:.1f} km²)</span>'
+            mangrove_border = "#2ea04355"
+            mangrove_taxa_html = "".join([
+                f'<div style="font-size:.78rem;line-height:1.45;margin-top:3px">'
+                f'&bull; <i>{t["scientific"]}</i> ({t["common"]}) &middot; <span style="color:#2ea043;font-weight:600">{t["status"]}</span><br>'
+                f'<span style="color:{theme.MUTED};font-size:.73rem;padding-left:8px">{t["role"]}</span></div>'
+                for t in mangrove_reg["taxa"]
+            ])
+        else:
+            mangrove_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#8b949e22;color:#8b949e;font-weight:600;font-size:.72rem;border:1px solid #8b949e44">○ No Buffer Within 1 km</span>'
+            mangrove_border = theme.LINE
+            mangrove_taxa_html = f'<div style="font-size:.75rem;color:{theme.MUTED};margin-top:2px">Segment is outside active estuarine mangrove buffer (&gt; 1,000 m).</div>'
+
+        st.markdown(
+            f"""
+<div class="pos-card" style="border-left:3px solid #2ea043;padding:0.75rem 0.9rem;margin-bottom:0.6rem">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:650;font-size:.88rem;color:#2ea043">Estuarine Mangrove Forest</span>
+    {mangrove_badge}
+  </div>
+  <div style="font-size:.79rem;line-height:1.45;margin-top:4px">
+    <b>Coastal Defense Role:</b> {mangrove_reg['protection_service']}.
+  </div>
+  <div style="font-size:.76rem;color:{theme.MUTED};margin-top:5px;font-weight:600">DOCUMENTED ASSOCIATED SPECIES / TAXA:</div>
+  {mangrove_taxa_html}
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+        # 3. Seagrass Meadow Card
+        seagrass_reg = prof["seagrass_registry"]
+        seagrass_taxa_html = "".join([
+            f'<div style="font-size:.78rem;line-height:1.45;margin-top:3px">'
+            f'&bull; <i>{t["scientific"]}</i> ({t["common"]}) &middot; <span style="color:{theme.MUTED};font-weight:600">{t["status"]}</span><br>'
+            f'<span style="color:{theme.MUTED};font-size:.73rem;padding-left:8px">{t["role"]}</span></div>'
+            for t in seagrass_reg["taxa"]
+        ])
+        st.markdown(
+            f"""
+<div class="pos-card" style="border-left:3px solid #8b949e;padding:0.75rem 0.9rem;margin-bottom:0.6rem">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:650;font-size:.88rem;color:#c9d1d9">Lagoon Seagrass Meadows</span>
+    <span style="padding:2px 7px;border-radius:4px;background:#8b949e22;color:#8b949e;font-weight:600;font-size:.72rem;border:1px solid #8b949e44">Unmapped in InVEST Model</span>
+  </div>
+  <div style="font-size:.79rem;line-height:1.45;margin-top:4px">
+    <b>Ecological &amp; Defense Role:</b> {seagrass_reg['protection_service']}.
+  </div>
+  <div style="font-size:.76rem;color:{theme.MUTED};margin-top:5px;font-weight:600">CHARACTERISTIC LAGOON TAXA:</div>
+  {seagrass_taxa_html}
+  <div style="font-size:.72rem;color:{theme.MUTED};margin-top:4px;font-style:italic">
+    Note: Seagrass beds are documented in Blue Bay lagoon but are unmapped in the current GIS vector inputs.
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+        # 4. Tailored Ecological Narrative Callout
+        st.markdown(
+            f"""
+<div class="pos-card" style="background:{theme.PANEL_2};border-left:3px solid {theme.ACCENT};padding:0.75rem 0.9rem;margin-bottom:0.6rem">
+  <div class="pos-label" style="color:{theme.ACCENT}">Ecological &amp; Operational Assessment</div>
+  <div style="font-size:.82rem;line-height:1.55;color:{theme.TEXT}">
+    {prof['ecological_summary']}
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+        # 5. Biophysical Drivers Component Breakdown
+        pt = df.iloc[segment_id]
         r_hab_val = float(pt.get("r_hab", 1.0))
         r_wave_val = float(pt.get("r_wave", 1.0))
         r_wind_val = float(pt.get("r_wind", 1.0))
         r_relief_val = float(pt.get("r_relief", 1.0))
         r_surge_val = float(pt.get("r_surge", 1.0))
 
-        st.markdown(
-            f"""
-<div class="pos-card">
-<div style="display:flex;justify-content:space-between;align-items:center">
-  <span style="font-weight:700;font-size:1rem">Segment #{shore_id_val}</span>
-  <span style="padding:2px 8px;border-radius:4px;background:{color_val}22;color:{color_val};font-weight:600;font-size:.78rem">{tier_val}</span>
+        with st.expander("Biophysical components breakdown (Ranks 1–5)", expanded=False):
+            st.markdown(
+                f"""
+<div style="font-size:.83rem;line-height:1.7">
+<b>Storm Surge Potential (R_surge):</b> {r_surge_val:.0f} / 5<br>
+<b>Wind Fetch Exposure (R_wind):</b> {r_wind_val:.0f} / 5<br>
+<b>Natural Habitats Buffer (R_hab):</b> {r_hab_val:.0f} / 5<br>
+<b>Wave Energy Exposure (R_wave):</b> {r_wave_val:.0f} / 5<br>
+<b>Coastal Elevation / Relief (R_relief):</b> {r_relief_val:.0f} / 5
 </div>
-<div class="mono" style="font-size:.76rem;color:{theme.MUTED};margin-top:4px">
-  {lat_val:.4f}&deg; N, {lon_val:.4f}&deg; E &middot; {dist_str}
-</div>
-<div style="font-size:.84rem;margin-top:8px;line-height:1.6">
-  <b>Cumulative Exposure Index:</b> {ei_val:.2f}<br>
-  &bull; Habitats Protection: <b>{r_hab_val:.0f}</b> / 5<br>
-  &bull; Wave Exposure: <b>{r_wave_val:.0f}</b> / 5<br>
-  &bull; Wind Fetch: <b>{r_wind_val:.0f}</b> / 5<br>
-  &bull; Coastal Relief: <b>{r_relief_val:.0f}</b> / 5<br>
-  &bull; Storm Surge: <b>{r_surge_val:.0f}</b> / 5
-</div>
+<div style="font-size:.74rem;color:{theme.MUTED};margin-top:6px">
+InVEST ranks range 1 (maximum natural protection / lowest exposure) to 5 (least protected / highest exposure).
 </div>
 """,
-            unsafe_allow_html=True,
-        )
+                unsafe_allow_html=True,
+            )
