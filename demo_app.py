@@ -618,26 +618,81 @@ with tab5:
 </div>""", unsafe_allow_html=True)
 
             st.markdown('<div class="section-label">Habitat &amp; Species Impact</div>', unsafe_allow_html=True)
-            species_preview = []
-            if prof.get("has_coral"):
-                species_preview.append("• <i>Acropora muricata</i> (Staghorn Coral) · Reef dissipator")
-                species_preview.append("• <i>Chelonia mydas</i> (Green Sea Turtle) · Endangered")
-            if prof.get("has_mangrove"):
-                species_preview.append("• <i>Rhizophora mucronata</i> (Red Mangrove) · Prop roots")
-                species_preview.append("• <i>Lutjanus kasmira</i> (Bluestripe Snapper) · Nursery")
-            if not species_preview:
-                species_preview.append("• Shoreline is outside natural habitat buffer zones (> 2 km).")
 
-            sp_html = "<br>".join(species_preview)
-            st.markdown(f"""<div class="kpi-card" style="font-size:.78rem;line-height:1.45;margin-bottom:8px">
-  <b>Documented Indicator Taxa ({prof['species_count']}):</b><br>
-  {sp_html}
-  <div style="font-size:.71rem;color:#8b949e;margin-top:4px">
-    Ramsar Site #1798 / Blue Bay Marine Park baseline.
+            # 1. Coral Reef Card
+            coral_reg = prof["coral_registry"]
+            if prof["has_coral"]:
+                coral_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#00d2d222;color:#00d2d2;font-weight:600;font-size:.72rem;border:1px solid #00d2d255">● 2,000 m Buffer Active ({prof["coral_area_km2"]:.1f} km²)</span>'
+                coral_taxa_html = "".join([
+                    f'<div style="font-size:.77rem;line-height:1.4;margin-top:3px">'
+                    f'&bull; <i>{t["scientific"]}</i> ({t["common"]}) &middot; <span style="color:#00d2d2;font-weight:600">{t["status"]}</span><br>'
+                    f'<span style="color:#8b949e;font-size:.72rem;padding-left:8px">{t["role"]}</span></div>'
+                    for t in coral_reg["taxa"]
+                ])
+            else:
+                coral_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#8b949e22;color:#8b949e;font-weight:600;font-size:.72rem">○ No Buffer Within 2 km</span>'
+                coral_taxa_html = '<div style="font-size:.75rem;color:#8b949e;margin-top:2px">Segment is outside active coral reef buffer (&gt; 2,000 m).</div>'
+
+            st.markdown(f"""<div class="kpi-card" style="border-left:3px solid #00d2d2;padding:0.75rem 0.9rem;margin-bottom:8px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:650;font-size:.88rem;color:#00d2d2">Coral Reef Barrier</span>
+    {coral_badge}
   </div>
+  <div style="font-size:.78rem;line-height:1.45;margin-top:4px">
+    <b>Coastal Defense Role:</b> {coral_reg['protection_service']}.
+  </div>
+  <div style="font-size:.74rem;color:#8b949e;margin-top:5px;font-weight:600">DOCUMENTED ASSOCIATED SPECIES / TAXA:</div>
+  {coral_taxa_html}
+</div>""", unsafe_allow_html=True)
+
+            # 2. Mangrove Card
+            mangrove_reg = prof["mangrove_registry"]
+            if prof["has_mangrove"]:
+                mangrove_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#2ea04322;color:#2ea043;font-weight:600;font-size:.72rem;border:1px solid #2ea04355">● 1,000 m Buffer Active ({prof["mangrove_area_km2"]:.1f} km²)</span>'
+                mangrove_taxa_html = "".join([
+                    f'<div style="font-size:.77rem;line-height:1.4;margin-top:3px">'
+                    f'&bull; <i>{t["scientific"]}</i> ({t["common"]}) &middot; <span style="color:#2ea043;font-weight:600">{t["status"]}</span><br>'
+                    f'<span style="color:#8b949e;font-size:.72rem;padding-left:8px">{t["role"]}</span></div>'
+                    for t in mangrove_reg["taxa"]
+                ])
+            else:
+                mangrove_badge = f'<span style="padding:2px 7px;border-radius:4px;background:#8b949e22;color:#8b949e;font-weight:600;font-size:.72rem">○ No Buffer Within 1 km</span>'
+                mangrove_taxa_html = '<div style="font-size:.75rem;color:#8b949e;margin-top:2px">Segment is outside active estuarine mangrove buffer (&gt; 1,000 m).</div>'
+
+            st.markdown(f"""<div class="kpi-card" style="border-left:3px solid #2ea043;padding:0.75rem 0.9rem;margin-bottom:8px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:650;font-size:.88rem;color:#2ea043">Estuarine Mangrove Forest</span>
+    {mangrove_badge}
+  </div>
+  <div style="font-size:.78rem;line-height:1.45;margin-top:4px">
+    <b>Coastal Defense Role:</b> {mangrove_reg['protection_service']}.
+  </div>
+  <div style="font-size:.74rem;color:#8b949e;margin-top:5px;font-weight:600">DOCUMENTED ASSOCIATED SPECIES / TAXA:</div>
+  {mangrove_taxa_html}
+</div>""", unsafe_allow_html=True)
+
+            # 3. Seagrass Meadow Card
+            seagrass_reg = prof["seagrass_registry"]
+            seagrass_taxa_html = "".join([
+                f'<div style="font-size:.77rem;line-height:1.4;margin-top:3px">'
+                f'&bull; <i>{t["scientific"]}</i> ({t["common"]}) &middot; <span style="color:#8b949e;font-weight:600">{t["status"]}</span><br>'
+                f'<span style="color:#8b949e;font-size:.72rem;padding-left:8px">{t["role"]}</span></div>'
+                for t in seagrass_reg["taxa"]
+            ])
+            st.markdown(f"""<div class="kpi-card" style="border-left:3px solid #8b949e;padding:0.75rem 0.9rem;margin-bottom:8px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:650;font-size:.88rem;color:#c9d1d9">Lagoon Seagrass Meadows</span>
+    <span style="padding:2px 7px;border-radius:4px;background:#8b949e22;color:#8b949e;font-weight:600;font-size:.72rem">Unmapped in InVEST Model</span>
+  </div>
+  <div style="font-size:.78rem;line-height:1.45;margin-top:4px">
+    <b>Ecological Role:</b> {seagrass_reg['protection_service']}.
+  </div>
+  <div style="font-size:.74rem;color:#8b949e;margin-top:5px;font-weight:600">CHARACTERISTIC LAGOON TAXA:</div>
+  {seagrass_taxa_html}
 </div>""", unsafe_allow_html=True)
 
             st.markdown(f"""<div class="kpi-card" style="font-size:.76rem;line-height:1.45;color:#c9d1d9;border-left:3px solid #31c8e8">
+  <div style="font-size:.70rem;text-transform:uppercase;color:#31c8e8;letter-spacing:0.08em;margin-bottom:4px;font-weight:700">Ecological &amp; Operational Assessment</div>
   {prof['ecological_summary']}
 </div>""", unsafe_allow_html=True)
     else:

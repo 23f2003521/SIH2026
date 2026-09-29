@@ -1,0 +1,58 @@
+{
+  "type": "FeatureCollection",
+  "name": "mangrove_mauritius",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_id": "mangrove_grand_port",
+        "habitat_type": "mangrove",
+        "name": "Grand Port Estuarine Mangrove Forest",
+        "area_km2": 0.82,
+        "area_ha": 82.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [57.700, -20.415],
+            [57.708, -20.410],
+            [57.715, -20.405],
+            [57.722, -20.400],
+            [57.728, -20.392],
+            [57.725, -20.388],
+            [57.718, -20.395],
+            [57.710, -20.400],
+            [57.702, -20.408],
+            [57.698, -20.412],
+            [57.700, -20.415]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_id": "mangrove_ile_aux_cerfs",
+        "habitat_type": "mangrove",
+        "name": "Trou d'Eau Douce - Anse Jonchée Mangrove Stand",
+        "area_km2": 0.58,
+        "area_ha": 58.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [57.755, -20.355],
+            [57.762, -20.350],
+            [57.768, -20.342],
+            [57.765, -20.338],
+            [57.758, -20.345],
+            [57.752, -20.352],
+            [57.755, -20.355]
+          ]
+        ]
+      }
+    }
+  ]
+}

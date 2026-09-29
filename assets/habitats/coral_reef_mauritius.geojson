@@ -1,0 +1,64 @@
+{
+  "type": "FeatureCollection",
+  "name": "coral_reef_mauritius",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_id": "reef_pointe_desny",
+        "habitat_type": "coral_reef",
+        "name": "Pointe d'Esny Outer Barrier Reef",
+        "area_km2": 2.45,
+        "area_ha": 245.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [57.722, -20.448],
+            [57.735, -20.442],
+            [57.748, -20.438],
+            [57.755, -20.428],
+            [57.760, -20.415],
+            [57.762, -20.395],
+            [57.768, -20.375],
+            [57.778, -20.355],
+            [57.785, -20.335],
+            [57.780, -20.332],
+            [57.772, -20.352],
+            [57.761, -20.373],
+            [57.754, -20.395],
+            [57.750, -20.413],
+            [57.742, -20.425],
+            [57.730, -20.435],
+            [57.718, -20.443],
+            [57.722, -20.448]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_id": "reef_blue_bay",
+        "habitat_type": "coral_reef",
+        "name": "Blue Bay Marine Park Micro-atoll Reef",
+        "area_km2": 1.15,
+        "area_ha": 115.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [57.708, -20.450],
+            [57.718, -20.445],
+            [57.725, -20.449],
+            [57.722, -20.458],
+            [57.712, -20.456],
+            [57.708, -20.450]
+          ]
+        ]
+      }
+    }
+  ]
+}

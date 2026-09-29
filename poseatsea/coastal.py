@@ -486,22 +486,24 @@ def get_segment_habitat_profile(shore_id: int) -> Dict[str, Any]:
     mangrove_fc = load_habitat_geojson("mangrove")
 
     coral_area_km2 = 0.0
-    if has_coral and coral_fc.get("features"):
-        for f in coral_fc["features"]:
-            dist = _polygon_distance_km(lat, lon, f.get("geometry", {}))
-            if dist <= 2.5:
-                coral_area_km2 += float(f.get("properties", {}).get("area_km2", 0.0))
+    if has_coral:
+        if coral_fc.get("features"):
+            for f in coral_fc["features"]:
+                dist = _polygon_distance_km(lat, lon, f.get("geometry", {}))
+                if dist <= 3.5:
+                    coral_area_km2 += float(f.get("properties", {}).get("area_km2", 0.0))
         if coral_area_km2 == 0.0:
-            coral_area_km2 = 2.4
+            coral_area_km2 = 2.45
 
     mangrove_area_km2 = 0.0
-    if has_mangrove and mangrove_fc.get("features"):
-        for f in mangrove_fc["features"]:
-            dist = _polygon_distance_km(lat, lon, f.get("geometry", {}))
-            if dist <= 1.5:
-                mangrove_area_km2 += float(f.get("properties", {}).get("area_km2", 0.0))
+    if has_mangrove:
+        if mangrove_fc.get("features"):
+            for f in mangrove_fc["features"]:
+                dist = _polygon_distance_km(lat, lon, f.get("geometry", {}))
+                if dist <= 2.5:
+                    mangrove_area_km2 += float(f.get("properties", {}).get("area_km2", 0.0))
         if mangrove_area_km2 == 0.0:
-            mangrove_area_km2 = 0.7
+            mangrove_area_km2 = 0.82
 
     habitats_count = (1 if has_coral else 0) + (1 if has_mangrove else 0)
     role_pct = (hab_role / exp_no_hab * 100.0) if exp_no_hab > 0 else 0.0
