@@ -64,6 +64,11 @@ assets/gebco/
 assets/derived/
 assets/environment_cache/
 assets/significant_height_of_combined_wind_waves_swell/
+assets/coastal_vulnerability/*.gpkg
+assets/coastal_vulnerability/invest_workspace/*.gpkg
+assets/coastal_vulnerability/invest_workspace/intermediate/*.gpkg
+assets/coastal_vulnerability/invest_workspace/intermediate/habitats/*.pickle
+assets/landmass/
 assets/coastal_vulnerability/invest_workspace/intermediate/relief/
 assets/coastal_vulnerability/invest_workspace/intermediate/shore_points/
 assets/coastal_vulnerability/invest_workspace/intermediate/surge/
